@@ -1,0 +1,65 @@
+import path from "node:path";
+import { z } from "zod";
+
+// One kind enum feeds the config parser and --only. A discriminated union
+// per kind from day one, the direct fix for drzl's flat 27-kind object.
+export const TARGET_KINDS = ["zod"] as const;
+
+const ZodTargetConfig = z.object({
+  kind: z.literal("zod"),
+  path: z.string().optional(),
+  strict: z.boolean().optional(),
+});
+
+const TargetConfig = z.discriminatedUnion("kind", [ZodTargetConfig]);
+
+const SourceConfig = z
+  .discriminatedUnion("kind", [
+    z.object({ kind: z.literal("listen"), debounceMs: z.number().int().positive().optional() }),
+    z.object({ kind: z.literal("manual") }),
+  ])
+  .default({ kind: "listen" });
+
+export const ConfigSchema = z.object({
+  schemas: z.array(z.string()).default(["public"]),
+  outDir: z.string().default("src/schemas"),
+  source: SourceConfig,
+  targets: z.array(TargetConfig).min(1),
+});
+
+export type SupawatchConfig = z.output<typeof ConfigSchema>;
+export type TargetConfigItem = SupawatchConfig["targets"][number];
+
+export function defineConfig(config: z.input<typeof ConfigSchema>): z.input<typeof ConfigSchema> {
+  return config;
+}
+
+export async function loadConfig(cwd: string): Promise<SupawatchConfig> {
+  const { createJiti } = await import("jiti");
+  const jiti = createJiti(import.meta.url);
+  const candidates = ["supawatch.config.ts", "supawatch.config.mjs", "supawatch.config.js"];
+  for (const candidate of candidates) {
+    const file = path.join(cwd, candidate);
+    let mod: unknown;
+    try {
+      mod = await jiti.import(file);
+    } catch (err) {
+      if (isModuleNotFound(err, file)) continue;
+      throw err;
+    }
+    const raw = (mod as { default?: unknown }).default ?? mod;
+    return ConfigSchema.parse(raw);
+  }
+  throw new Error(
+    `no supawatch.config.{ts,mjs,js} found in ${cwd}; run "supawatch init" first`,
+  );
+}
+
+// "Not found" vs "threw" must stay distinguishable; the error code alone is
+// ambiguous because a config importing a missing package throws the same
+// code, so the message is matched against the quoted file path.
+function isModuleNotFound(err: unknown, file: string): boolean {
+  const e = err as { code?: string; message?: string };
+  if (e.code !== "ERR_MODULE_NOT_FOUND" && e.code !== "MODULE_NOT_FOUND") return false;
+  return (e.message ?? "").includes(file);
+}

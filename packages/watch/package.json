@@ -1,0 +1,29 @@
+{
+  "name": "@supawatch/watch",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supawatch/core": "workspace:*",
+    "postgres": "^3.4.5"
+  },
+  "devDependencies": {
+    "@supawatch/target-zod": "workspace:*",
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.0",
+    "zod": "^4.4.3"
+  }
+}

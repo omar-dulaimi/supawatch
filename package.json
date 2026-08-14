@@ -1,0 +1,19 @@
+{
+  "name": "supawatch-monorepo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "pnpm -r run build",
+    "test": "pnpm run build && vitest run",
+    "e2e": "bash e2e/demo.sh",
+    "gate": "pnpm run test && pnpm run e2e"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.3.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.0.0"
+  },
+  "pnpm": {
+    "allowBuilds": ["esbuild"]
+  }
+}
