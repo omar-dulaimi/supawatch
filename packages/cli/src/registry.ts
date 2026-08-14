@@ -20,6 +20,14 @@ export const TARGETS: readonly TargetEntry[] = [
     construct: (m) => new (m as { ZodTarget: new () => Target }).ZodTarget(),
     outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "zod"),
   },
+  {
+    kind: "valibot",
+    specifier: "@supawatch/target-valibot",
+    load: () => import("@supawatch/target-valibot"),
+    construct: (m) =>
+      new (m as { ValibotTarget: new () => Target }).ValibotTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "valibot"),
+  },
 ];
 
 export function entryFor(kind: TargetConfigItem["kind"]): TargetEntry {

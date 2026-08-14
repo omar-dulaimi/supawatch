@@ -49,7 +49,8 @@ export type Querier = <T = Record<string, unknown>>(
 
 export interface Import {
   from: string;
-  names: string[];
+  names?: string[];
+  namespace?: string;
 }
 
 export interface Rendered {

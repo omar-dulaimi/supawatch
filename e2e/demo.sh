@@ -40,7 +40,7 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod watch cli; do
+for pkg in core target-zod target-valibot watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 cat > out-work/package.json <<PKG
@@ -50,10 +50,12 @@ cat > out-work/package.json <<PKG
   "type": "module",
   "dependencies": {
     "supawatch": "file:../tars/supawatch-0.1.0.tgz",
+    "valibot": "^1.1.0",
     "zod": "^4.0.0"
   },
   "overrides": {
     "@supawatch/core": "file:../tars/supawatch-core-0.1.0.tgz",
+    "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-0.1.0.tgz",
     "@supawatch/target-zod": "file:../tars/supawatch-target-zod-0.1.0.tgz",
     "@supawatch/watch": "file:../tars/supawatch-watch-0.1.0.tgz"
   }
@@ -77,7 +79,7 @@ export default defineConfig({
   schemas: ["public"],
   outDir: "$OUT",
   source: { kind: "listen", debounceMs: 300 },
-  targets: [{ kind: "zod", strict: true }],
+  targets: [{ kind: "zod", strict: true }, { kind: "valibot", strict: true }],
 });
 CFG
 # exec replaces the subshell, so $! is the watcher itself; setsid makes
@@ -112,6 +114,18 @@ awk -v n="ground-truth check, refunds: 1/1 passed" 'index($0, n) { f = 1 } END {
 [ -f "$OUT/zod/orders.d.mts" ] || fail "orders.d.mts missing"
 awk 'index($0, "refund_reason") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "regenerated schema lacks refund_reason"
 awk -v n="\"refunded\"" 'index($0, n) { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "enum value refunded missing"
+[ -f "$OUT/valibot/orders.mjs" ] || fail "valibot orders.mjs missing"
+awk 'index($0, "v.picklist") && index($0, "\"refunded\"") { f = 1 } END { exit !f }' "$OUT/valibot/orders.mjs" || fail "valibot enum missing refunded"
+
+echo "== 10. check: clean tree passes, tampering fails =="
+(cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"
+printf '// tampered\n' >> "$OUT/zod/orders.mjs"
+if (cd out-work && "$CLI" check > ../check-drift.log 2>&1); then
+  fail "check missed hand-edited drift"
+fi
+awk 'index($0, "drift (stale)") { f = 1 } END { exit !f }' check-drift.log || fail "check did not name the stale file"
+(cd out-work && "$CLI" generate >/dev/null) || fail "generate could not repair drift"
+(cd out-work && "$CLI" check) || fail "check still drifting after regenerate"
 
 echo
 echo "================ watch.log ================"

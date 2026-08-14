@@ -9,6 +9,7 @@ commands:
   init      write the event-trigger migration and a starter config
   generate  introspect, generate, verify, write, once
   watch     run the live watcher (event trigger + LISTEN)
+  check     CI drift gate: regenerate in memory, diff against disk, no writes
 `;
 
 async function main() {
@@ -24,6 +25,19 @@ async function main() {
     case "watch":
       await watchForever(await loadConfig(cwd));
       return;
+    case "check": {
+      const { check } = await import("./check.js");
+      const drift = await check(await loadConfig(cwd));
+      if (drift.length === 0) {
+        console.log("[supawatch] check: no drift");
+        return;
+      }
+      for (const d of drift) {
+        console.log(`[supawatch] drift (${d.kind}): ${d.file}`);
+      }
+      process.exitCode = 1;
+      return;
+    }
     default:
       console.log(USAGE);
       process.exitCode = command ? 1 : 0;

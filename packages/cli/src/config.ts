@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // One kind enum feeds the config parser and --only. A discriminated union
 // per kind from day one, the direct fix for drzl's flat 27-kind object.
-export const TARGET_KINDS = ["zod"] as const;
+export const TARGET_KINDS = ["zod", "valibot"] as const;
 
 const ZodTargetConfig = z.object({
   kind: z.literal("zod"),
@@ -11,7 +11,16 @@ const ZodTargetConfig = z.object({
   strict: z.boolean().optional(),
 });
 
-const TargetConfig = z.discriminatedUnion("kind", [ZodTargetConfig]);
+const ValibotTargetConfig = z.object({
+  kind: z.literal("valibot"),
+  path: z.string().optional(),
+  strict: z.boolean().optional(),
+});
+
+const TargetConfig = z.discriminatedUnion("kind", [
+  ZodTargetConfig,
+  ValibotTargetConfig,
+]);
 
 const SourceConfig = z
   .discriminatedUnion("kind", [
