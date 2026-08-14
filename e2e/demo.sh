@@ -114,6 +114,11 @@ $PSQL -c "insert into refunds (order_id, amount) values (1, '49.90');" >/dev/nul
 wait_for_log "table public.refunds created" 15
 sleep 1
 
+echo "== 7b. Live DDL: a view appears =="
+$PSQL -c 'create view refunded_orders as select o.id, r.amount from orders o join refunds r on r.order_id = o.id;' >/dev/null
+wait_for_log "view public.refunded_orders created" 15
+sleep 1
+
 echo "== 8. Stop watcher =="
 kill -- "-$WATCHER_PID" 2>/dev/null || true
 wait "$WATCHER_PID" 2>/dev/null || true
@@ -133,6 +138,10 @@ awk 'index($0, "v.picklist") && index($0, "\"refunded\"") { f = 1 } END { exit !
 awk "index(\$0, \"'refunded'\") { f = 1 } END { exit !f }" "$OUT/arktype/orders.mjs" || fail "arktype enum missing refunded"
 [ -f "$OUT/typebox/orders.mjs" ] || fail "typebox orders.mjs missing"
 awk 'index($0, "Type.Literal(\"refunded\")") { f = 1 } END { exit !f }' "$OUT/typebox/orders.mjs" || fail "typebox enum missing refunded"
+awk 'index($0, "\"totals\": z.string().nullable()") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "composite column not mapped to string"
+awk 'index($0, "\"email\": z.string()") { f = 1 } END { exit !f }' "$OUT/zod/users.mjs" || fail "domain column not resolved to base string"
+[ -f "$OUT/zod/paid_orders.mjs" ] || fail "view paid_orders not emitted"
+[ -f "$OUT/zod/refunded_orders.mjs" ] || fail "live-created view not emitted"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

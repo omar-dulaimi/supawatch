@@ -7,15 +7,19 @@ export function diff(prev: Snapshot, next: Snapshot): string[] {
   const prevTables = new Map(prev.tables.map((t) => [key(t), t]));
   const nextTables = new Map(next.tables.map((t) => [key(t), t]));
 
-  for (const [k] of nextTables) {
-    if (!prevTables.has(k)) changes.push(`table ${k} created`);
+  for (const [k, t] of nextTables) {
+    if (!prevTables.has(k)) changes.push(`${t.kind} ${k} created`);
   }
-  for (const [k] of prevTables) {
-    if (!nextTables.has(k)) changes.push(`table ${k} dropped`);
+  for (const [k, t] of prevTables) {
+    if (!nextTables.has(k)) changes.push(`${t.kind} ${k} dropped`);
   }
   for (const [k, nextT] of nextTables) {
     const prevT = prevTables.get(k);
-    if (prevT) changes.push(...diffTable(prevT, nextT));
+    if (!prevT) continue;
+    if (prevT.kind !== nextT.kind) {
+      changes.push(`${k} is now a ${nextT.kind}`);
+    }
+    changes.push(...diffTable(prevT, nextT));
   }
 
   const prevEnums = new Map(prev.enums.map((e) => [`${e.schema}.${e.name}`, e]));
@@ -36,6 +40,24 @@ export function diff(prev: Snapshot, next: Snapshot): string[] {
   }
   for (const [k] of prevEnums) {
     if (!nextEnums.has(k)) changes.push(`enum ${k} dropped`);
+  }
+
+  const prevDomains = new Map(prev.domains.map((d) => [`${d.schema}.${d.name}`, d]));
+  const nextDomains = new Map(next.domains.map((d) => [`${d.schema}.${d.name}`, d]));
+  for (const [k, d] of nextDomains) {
+    if (!prevDomains.has(k)) changes.push(`domain ${k} created (base ${d.baseTypeName})`);
+  }
+  for (const [k] of prevDomains) {
+    if (!nextDomains.has(k)) changes.push(`domain ${k} dropped`);
+  }
+
+  const prevComposites = new Map(prev.composites.map((c) => [`${c.schema}.${c.name}`, c]));
+  const nextComposites = new Map(next.composites.map((c) => [`${c.schema}.${c.name}`, c]));
+  for (const [k] of nextComposites) {
+    if (!prevComposites.has(k)) changes.push(`composite ${k} created`);
+  }
+  for (const [k] of prevComposites) {
+    if (!nextComposites.has(k)) changes.push(`composite ${k} dropped`);
   }
 
   return changes;

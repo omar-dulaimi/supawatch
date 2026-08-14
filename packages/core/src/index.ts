@@ -1,5 +1,7 @@
 export type {
   Column,
+  CompositeTypeInfo,
+  DomainType,
   EnumType,
   Import,
   Querier,
@@ -13,7 +15,7 @@ export type {
   Verdict,
   Verifier,
 } from "./types.js";
-export { introspect } from "./introspect.js";
+export { introspect, type IntrospectOptions } from "./introspect.js";
 export { diff } from "./diff.js";
 export { runtimeFor, MAPPED_PG_TYPES } from "./runtime-map.js";
 export { assemble, atomicSink, type FileSink } from "./emit.js";

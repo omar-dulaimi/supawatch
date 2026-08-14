@@ -29,7 +29,7 @@ export function listenSource(
 // Slower and chattier than listen, but zero database setup.
 export function pollSource(
   query: import("@supawatch/core").Querier,
-  opts: { intervalMs?: number; schemas?: string[] } = {},
+  opts: { intervalMs?: number; schemas?: string[]; includeViews?: boolean } = {},
 ): TriggerSource {
   const intervalMs = opts.intervalMs ?? 5000;
   let timer: NodeJS.Timeout | null = null;
@@ -39,7 +39,11 @@ export function pollSource(
     async start(onWake) {
       const { introspect } = await import("@supawatch/core");
       const hashNow = async () =>
-        JSON.stringify(await introspect(query, opts.schemas));
+        JSON.stringify(
+          await introspect(query, opts.schemas, {
+            includeViews: opts.includeViews,
+          }),
+        );
       lastHash = await hashNow();
       timer = setInterval(() => {
         void (async () => {

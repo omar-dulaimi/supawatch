@@ -5,8 +5,14 @@ import { MAPPED_PG_TYPES, type Snapshot } from "@supawatch/core";
 // "every mapping row is verified" a build property instead of a hope.
 export const FIXTURE_SQL = `
 create type parcel_state as enum ('queued', 'shipped', 'lost');
+create type dimensions as (width_mm int4, height_mm int4);
+create domain tracking_code as text;
+create domain weight_grams as int4;
 
 create table parcels (
+  size dimensions,
+  tracking tracking_code not null default 'T-1',
+  weight weight_grams not null default 250,
   id serial primary key,
   small int2 not null default 1,
   big int8 not null default 9007199254740993,
@@ -26,7 +32,12 @@ create table parcels (
   note text
 );
 
-insert into parcels (note) values ('first'), (null);
+insert into parcels (note, size) values
+  ('first', row(100, 40)::dimensions),
+  (null, null);
+
+create view lost_parcels as
+  select id, tracking, state from parcels where state = 'lost';
 `;
 
 export function assertFixtureCompleteness(snapshot: Snapshot): void {

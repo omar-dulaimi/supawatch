@@ -37,6 +37,7 @@ export async function generateOnce(cfg: SupawatchConfig): Promise<void> {
     const watcher = new Watcher({
       query: querierFrom(sql),
       schemas: cfg.schemas,
+      includeViews: cfg.includeViews,
       targets: await buildTargetRuns(cfg),
       source: manualSource(),
     });
@@ -65,6 +66,7 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
       ? pollSource(query, {
           intervalMs: cfg.source.intervalMs,
           schemas: cfg.schemas,
+      includeViews: cfg.includeViews,
         })
       : listenSource(sql, () =>
           console.log("[supawatch] idle, listening on schema_changed"),
@@ -72,6 +74,7 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
   const watcher = new Watcher({
     query,
     schemas: cfg.schemas,
+    includeViews: cfg.includeViews,
     targets: await buildTargetRuns(cfg),
     source,
     debounceMs,

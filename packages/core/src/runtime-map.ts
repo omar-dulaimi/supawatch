@@ -13,6 +13,12 @@ export function runtimeFor(
     const e = snapshot.enums.find((x) => x.name === pgTypeName);
     if (e) return { kind: "enum", labels: e.labels };
   }
+  // Measured, not assumed: the driver hands a composite column back as
+  // its raw row literal, e.g. "(EUR,950)". A nested object schema here
+  // would fail ground truth; string is the honest mapping.
+  if (typeKind === "c") {
+    return { kind: "string", format: "composite" };
+  }
   switch (pgTypeName) {
     case "int2":
     case "int4":

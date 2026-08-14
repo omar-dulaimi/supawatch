@@ -31,6 +31,9 @@ const SourceConfig = z
 export const ConfigSchema = z.object({
   schemas: z.array(z.string()).default(["public"]),
   outDir: z.string().default("src/schemas"),
+  // Views are included by default; Postgres reports every view column
+  // as nullable, so their schemas are all-nullable and say so.
+  includeViews: z.boolean().default(true),
   source: SourceConfig,
   targets: z.array(TargetConfig).min(1),
 });

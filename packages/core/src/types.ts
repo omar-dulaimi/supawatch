@@ -4,7 +4,7 @@
 
 export type RuntimeType =
   | { kind: "number"; integer: boolean }
-  | { kind: "string"; format?: "uuid" | "numeric" | "bigint" }
+  | { kind: "string"; format?: "uuid" | "numeric" | "bigint" | "composite" }
   | { kind: "boolean" }
   | { kind: "date" }
   | { kind: "json" }
@@ -24,6 +24,10 @@ export interface Column {
 export interface Table {
   schema: string;
   name: string;
+  // Views are tables to a reader; the marker exists because Postgres
+  // reports every view column as nullable regardless of the underlying
+  // column, and consumers deserve to know that is why.
+  kind: "table" | "view";
   columns: Column[];
 }
 
@@ -33,9 +37,22 @@ export interface EnumType {
   labels: string[];
 }
 
+export interface DomainType {
+  schema: string;
+  name: string;
+  baseTypeName: string;
+}
+
+export interface CompositeTypeInfo {
+  schema: string;
+  name: string;
+}
+
 export interface Snapshot {
   tables: Table[];
   enums: EnumType[];
+  domains: DomainType[];
+  composites: CompositeTypeInfo[];
 }
 
 // Minimal query seam so core never depends on a specific driver. postgres.js

@@ -24,6 +24,52 @@ describe("introspect against a real Postgres (PGlite)", () => {
     ]);
   });
 
+  it("resolves domains to base runtime, composites to row-literal strings, views to all-nullable", async () => {
+    await db.exec(`
+      create type money_amount as (currency text, cents int4);
+      create domain email_addr as text;
+      create domain cents_amount as int4;
+      create domain nested_cents as cents_amount;
+      create table facets (
+        id serial primary key,
+        contact email_addr not null,
+        fee cents_amount not null,
+        deep nested_cents not null,
+        split money_amount
+      );
+      create view facet_view as select id, contact from facets;
+    `);
+    const s = await introspect(querierFromPglite(db));
+    const facets = s.tables.find((t) => t.name === "facets")!;
+    const by = Object.fromEntries(facets.columns.map((c) => [c.name, c]));
+
+    expect(by.contact.runtime).toEqual({ kind: "string" });
+    expect(by.fee.runtime).toEqual({ kind: "number", integer: true });
+    expect(by.deep.runtime).toEqual({ kind: "number", integer: true });
+    expect(by.split.runtime).toEqual({ kind: "string", format: "composite" });
+
+    expect(s.domains.map((d) => d.name).sort()).toEqual([
+      "cents_amount",
+      "email_addr",
+      "nested_cents",
+    ]);
+    expect(s.domains.find((d) => d.name === "nested_cents")!.baseTypeName).toBe("int4");
+    expect(s.composites.map((c) => c.name)).toEqual(["money_amount"]);
+
+    const view = s.tables.find((t) => t.name === "facet_view")!;
+    expect(view.kind).toBe("view");
+    expect(view.columns.every((c) => c.nullable)).toBe(true);
+
+    const withoutViews = await introspect(querierFromPglite(db), ["public"], {
+      includeViews: false,
+    });
+    expect(withoutViews.tables.some((t) => t.name === "facet_view")).toBe(false);
+
+    await db.exec(
+      "drop view facet_view; drop table facets; drop domain nested_cents; drop domain cents_amount; drop domain email_addr; drop type money_amount;",
+    );
+  });
+
   it("maps runtime types from driver truth, not SQL names", () => {
     const orders = snapshot.tables.find((t) => t.name === "orders")!;
     const byName = Object.fromEntries(orders.columns.map((c) => [c.name, c]));

@@ -21,6 +21,7 @@ export interface TargetRun {
 export interface WatcherOptions {
   query: Querier;
   schemas?: string[];
+  includeViews?: boolean;
   targets: TargetRun[];
   source: TriggerSource;
   sink?: FileSink;
@@ -103,7 +104,9 @@ export class Watcher {
   }
 
   private async cycle(isBaseline: boolean): Promise<CycleResult> {
-    const next = await introspect(this.opts.query, this.opts.schemas);
+    const next = await introspect(this.opts.query, this.opts.schemas, {
+      includeViews: this.opts.includeViews,
+    });
     const changes = this.last ? diff(this.last, next) : [];
     if (!isBaseline && changes.length === 0) {
       return { changes, files: [], verified: [] };
