@@ -40,7 +40,7 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 cat > out-work/package.json <<PKG
@@ -50,11 +50,15 @@ cat > out-work/package.json <<PKG
   "type": "module",
   "dependencies": {
     "supawatch": "file:../tars/supawatch-0.1.0.tgz",
+    "@sinclair/typebox": "^0.34.0",
+    "arktype": "^2.1.0",
     "valibot": "^1.1.0",
     "zod": "^4.0.0"
   },
   "overrides": {
     "@supawatch/core": "file:../tars/supawatch-core-0.1.0.tgz",
+    "@supawatch/target-arktype": "file:../tars/supawatch-target-arktype-0.1.0.tgz",
+    "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-0.1.0.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-0.1.0.tgz",
     "@supawatch/target-zod": "file:../tars/supawatch-target-zod-0.1.0.tgz",
     "@supawatch/watch": "file:../tars/supawatch-watch-0.1.0.tgz"
@@ -79,9 +83,18 @@ export default defineConfig({
   schemas: ["public"],
   outDir: "$OUT",
   source: { kind: "listen", debounceMs: 300 },
-  targets: [{ kind: "zod", strict: true }, { kind: "valibot", strict: true }],
+  targets: [
+    { kind: "zod", strict: true },
+    { kind: "valibot", strict: true },
+    { kind: "arktype", strict: true },
+    { kind: "typebox", strict: true },
+  ],
 });
 CFG
+
+echo "== 5b. doctor before the trigger check (sanity of the whole path) =="
+(cd out-work && "$CLI" doctor) || fail_doctor=1
+if [ "${fail_doctor:-0}" -eq 1 ]; then echo "E2E FAILED: doctor reported unhealthy"; exit 1; fi
 # exec replaces the subshell, so $! is the watcher itself; setsid makes
 # that pid its own process group, so kill -- -$! reaches the whole tree.
 (cd out-work && exec setsid "$CLI" watch > ../watch.log 2>&1 < /dev/null) &
@@ -116,6 +129,10 @@ awk 'index($0, "refund_reason") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs"
 awk -v n="\"refunded\"" 'index($0, n) { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "enum value refunded missing"
 [ -f "$OUT/valibot/orders.mjs" ] || fail "valibot orders.mjs missing"
 awk 'index($0, "v.picklist") && index($0, "\"refunded\"") { f = 1 } END { exit !f }' "$OUT/valibot/orders.mjs" || fail "valibot enum missing refunded"
+[ -f "$OUT/arktype/orders.mjs" ] || fail "arktype orders.mjs missing"
+awk "index(\$0, \"'refunded'\") { f = 1 } END { exit !f }" "$OUT/arktype/orders.mjs" || fail "arktype enum missing refunded"
+[ -f "$OUT/typebox/orders.mjs" ] || fail "typebox orders.mjs missing"
+awk 'index($0, "Type.Literal(\"refunded\")") { f = 1 } END { exit !f }' "$OUT/typebox/orders.mjs" || fail "typebox enum missing refunded"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

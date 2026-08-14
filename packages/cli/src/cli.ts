@@ -10,6 +10,7 @@ commands:
   generate  introspect, generate, verify, write, once
   watch     run the live watcher (event trigger + LISTEN)
   check     CI drift gate: regenerate in memory, diff against disk, no writes
+  doctor    verify the setup end to end: connection, trigger, listen, targets
 `;
 
 async function main() {
@@ -36,6 +37,12 @@ async function main() {
         console.log(`[supawatch] drift (${d.kind}): ${d.file}`);
       }
       process.exitCode = 1;
+      return;
+    }
+    case "doctor": {
+      const { doctor } = await import("./doctor.js");
+      const healthy = await doctor(cwd);
+      if (!healthy) process.exitCode = 1;
       return;
     }
     default:

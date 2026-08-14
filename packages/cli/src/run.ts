@@ -2,6 +2,7 @@ import postgres from "postgres";
 import {
   listenSource,
   manualSource,
+  pollSource,
   querierFrom,
   Watcher,
   type TargetRun,
@@ -57,14 +58,22 @@ export async function generateOnce(cfg: SupawatchConfig): Promise<void> {
 
 export async function watchForever(cfg: SupawatchConfig): Promise<void> {
   const sql = connect();
+  const query = querierFrom(sql);
   const debounceMs = cfg.source.kind === "listen" ? cfg.source.debounceMs : undefined;
+  const source =
+    cfg.source.kind === "poll"
+      ? pollSource(query, {
+          intervalMs: cfg.source.intervalMs,
+          schemas: cfg.schemas,
+        })
+      : listenSource(sql, () =>
+          console.log("[supawatch] idle, listening on schema_changed"),
+        );
   const watcher = new Watcher({
-    query: querierFrom(sql),
+    query,
     schemas: cfg.schemas,
     targets: await buildTargetRuns(cfg),
-    source: listenSource(sql, () =>
-      console.log("[supawatch] idle, listening on schema_changed"),
-    ),
+    source,
     debounceMs,
   });
   const shutdown = async () => {

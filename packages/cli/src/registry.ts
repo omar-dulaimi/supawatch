@@ -28,6 +28,22 @@ export const TARGETS: readonly TargetEntry[] = [
       new (m as { ValibotTarget: new () => Target }).ValibotTarget(),
     outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "valibot"),
   },
+  {
+    kind: "arktype",
+    specifier: "@supawatch/target-arktype",
+    load: () => import("@supawatch/target-arktype"),
+    construct: (m) =>
+      new (m as { ArktypeTarget: new () => Target }).ArktypeTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "arktype"),
+  },
+  {
+    kind: "typebox",
+    specifier: "@supawatch/target-typebox",
+    load: () => import("@supawatch/target-typebox"),
+    construct: (m) =>
+      new (m as { TypeboxTarget: new () => Target }).TypeboxTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "typebox"),
+  },
 ];
 
 export function entryFor(kind: TargetConfigItem["kind"]): TargetEntry {

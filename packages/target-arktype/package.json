@@ -1,10 +1,7 @@
 {
-  "name": "supawatch",
+  "name": "@supawatch/target-arktype",
   "version": "0.1.0",
   "type": "module",
-  "bin": {
-    "supawatch": "./dist/cli.js"
-  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -13,22 +10,16 @@
       "default": "./dist/index.js"
     }
   },
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
     "@supawatch/core": "workspace:*",
-    "@supawatch/target-arktype": "workspace:*",
-    "@supawatch/target-typebox": "workspace:*",
-    "@supawatch/target-valibot": "workspace:*",
-    "@supawatch/target-zod": "workspace:*",
-    "@supawatch/watch": "workspace:*",
-    "jiti": "^2.4.0",
-    "postgres": "^3.4.5",
-    "zod": "^4.0.0"
+    "arktype": "^2.1.0"
+  },
+  "peerDependencies": {
+    "arktype": "^2.0.0"
   },
   "devDependencies": {
     "@types/node": "^22.20.1",
