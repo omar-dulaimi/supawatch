@@ -83,7 +83,7 @@ Documented, not yet exercised against a live project:
 
 ## Status
 
-0.4.0-dev, private. All four spec phases implemented. Not published to npm;
-the `@supawatch` org and the OIDC trusted-publisher setup are release-time
-work, and first publishes go out by hand per the known OIDC constraint on
-brand-new packages.
+0.1.0, unpublished, MIT licensed. All four spec phases implemented; versions
+are managed by changesets from here on. Not yet on npm; the `@supawatch` org
+registration and the first publish are manual steps (OIDC trusted publishing
+cannot publish a brand-new package), documented in RELEASING.md.

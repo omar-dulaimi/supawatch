@@ -92,6 +92,57 @@ describe("Watcher cycle against real Postgres (PGlite)", () => {
     expect(entries).not.toContain("doomed.d.mts");
   });
 
+  it("prefixes filenames with the schema when several schemas are watched", async () => {
+    await db.exec(`
+      create schema other;
+      create table other.things (id serial primary key, label text not null);
+      insert into other.things (label) values ('x');
+    `);
+    const dir2 = await mkdtemp(path.join(tmpdir(), "multi-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(db),
+        schemas: ["public", "other"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir2 }],
+        source: manualSource(),
+        log: () => {},
+      });
+      await watcher.runOnce();
+      const entries = await readdir(dir2);
+      expect(entries).toContain("public.things.mjs");
+      expect(entries).toContain("other.things.mjs");
+      expect(entries).not.toContain("things.mjs");
+    } finally {
+      await rm(dir2, { recursive: true, force: true });
+      await db.exec("drop schema other cascade");
+    }
+  });
+
+  it("a LISTEN reconnect wakes the watcher, the first ready does not", async () => {
+    const { listenSource } = await import("@supawatch/watch");
+    let captured: { onListen?: () => void } = {};
+    const fakeSql = {
+      listen: async (
+        _ch: string,
+        _onNotify: (x: string) => void,
+        onListen?: () => void,
+      ) => {
+        captured.onListen = onListen;
+        return { unlisten: async () => {} };
+      },
+    } as unknown as import("postgres").Sql;
+
+    const wakes: string[] = [];
+    const source = listenSource(fakeSql);
+    await source.start((hint) => wakes.push(hint));
+
+    captured.onListen!();
+    expect(wakes).toEqual([]);
+    captured.onListen!();
+    captured.onListen!();
+    expect(wakes).toEqual(["listen-reconnect", "listen-reconnect"]);
+  });
+
   it("skips regeneration when a wake finds no structural change", async () => {
     const watcher = new Watcher({
       query: querierFromPglite(db),

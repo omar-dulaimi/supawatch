@@ -115,18 +115,25 @@ export class Watcher {
     const files: string[] = [];
     const verified: CycleResult["verified"] = [];
 
+    // With one schema, files keep bare table names. With several, every
+    // file is prefixed with its schema, because two schemas can hold
+    // same-named tables and the last write would silently win otherwise.
+    const multiSchema = new Set(next.tables.map((t) => t.schema)).size > 1;
+    const fileBase = (t: { schema: string; name: string }) =>
+      multiSchema ? `${t.schema}.${t.name}` : t.name;
+
     for (const run of this.opts.targets) {
       const keep = new Set<string>();
       for (const table of next.tables) {
         const rendered = run.target.renderTable(table, next, run.options);
-        const base = `${table.name}${run.target.fileExtension}`;
+        const base = `${fileBase(table)}${run.target.fileExtension}`;
         const file = path.join(run.outDir, base);
         await this.sink.write(file, assemble(rendered));
         keep.add(base);
         files.push(file);
 
         if (run.target.renderTypes) {
-          const typesFile = path.join(run.outDir, `${table.name}.d.mts`);
+          const typesFile = path.join(run.outDir, `${fileBase(table)}.d.mts`);
           await this.sink.write(
             typesFile,
             run.target.renderTypes(table, next, run.options),
@@ -140,7 +147,7 @@ export class Watcher {
       }
       await this.sink.prune(run.outDir, keep, run.target.fileExtension);
       const keepTypes = new Set(
-        next.tables.map((t) => `${t.name}.d.mts`),
+        next.tables.map((t) => `${fileBase(t)}.d.mts`),
       );
       await this.sink.prune(run.outDir, keepTypes, ".d.mts");
     }

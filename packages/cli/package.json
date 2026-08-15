@@ -1,6 +1,13 @@
 {
   "name": "supawatch",
   "version": "0.1.0",
+  "license": "MIT",
+  "author": "Omar Dulaimi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omar-dulaimi/supawatch.git",
+    "directory": "packages/cli"
+  },
   "type": "module",
   "bin": {
     "supawatch": "./dist/cli.js"

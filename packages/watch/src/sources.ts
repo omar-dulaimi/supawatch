@@ -8,15 +8,24 @@ export interface TriggerSource {
 
 // The default source: the event trigger rings pg_notify('schema_changed'),
 // postgres.js holds a dedicated LISTEN connection that reconnects itself.
+// The ready callback fires on the initial connect AND on every reconnect;
+// a reconnect wakes the watcher, because DDL applied while the connection
+// was down produced notifications nobody heard. The diff makes a false
+// wake free: no structural change, no regeneration.
 export function listenSource(
   sql: postgres.Sql,
   onReady?: () => void,
 ): TriggerSource {
   let handle: { unlisten: () => Promise<void> } | undefined;
+  let readyCount = 0;
   return {
     name: "listen",
     async start(onWake) {
-      handle = await sql.listen("schema_changed", onWake, onReady);
+      handle = await sql.listen("schema_changed", onWake, () => {
+        readyCount++;
+        onReady?.();
+        if (readyCount > 1) onWake("listen-reconnect");
+      });
     },
     async stop() {
       await handle?.unlisten();

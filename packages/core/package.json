@@ -1,6 +1,13 @@
 {
   "name": "@supawatch/core",
   "version": "0.1.0",
+  "license": "MIT",
+  "author": "Omar Dulaimi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omar-dulaimi/supawatch.git",
+    "directory": "packages/core"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
