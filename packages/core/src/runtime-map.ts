@@ -40,13 +40,43 @@ export function runtimeFor(
       return { kind: "boolean" };
     case "timestamptz":
     case "timestamp":
-      return { kind: "date" };
+    case "date":
+      return { kind: "date" }; // both drivers return a Date for plain date too
+    case "time":
+    case "timetz":
+    case "interval":
+    case "inet":
+    case "cidr":
+    case "macaddr":
+      return { kind: "string" };
+    case "bytea":
+      return { kind: "bytes" }; // Uint8Array from PGlite, Buffer from postgres.js
     case "json":
     case "jsonb":
       return { kind: "json" };
     default:
       return { kind: "unknown" };
   }
+}
+
+// Arrays, decided from measured evidence:
+// - element-typed JS arrays for scalar elements, elements following the
+//   same driver truth (numeric[] arrives as string[]),
+// - EXCEPT enum arrays, which BOTH drivers hand back as the raw literal
+//   string "{a,b}", unparsed,
+// - and Postgres does not enforce declared dimensionality; a column
+//   declared with more than one dimension maps to array of unknown.
+export function arrayRuntimeFor(
+  elementRuntime: RuntimeType,
+  declaredDims: number,
+): RuntimeType {
+  if (elementRuntime.kind === "enum") {
+    return { kind: "string", format: "array-literal" };
+  }
+  if (declaredDims > 1) {
+    return { kind: "array", element: { kind: "unknown" } };
+  }
+  return { kind: "array", element: elementRuntime };
 }
 
 // The names above, exported so the verify harness can assert every one of
@@ -65,6 +95,14 @@ export const MAPPED_PG_TYPES = [
   "bool",
   "timestamptz",
   "timestamp",
+  "date",
+  "time",
+  "timetz",
+  "interval",
+  "bytea",
+  "inet",
+  "cidr",
+  "macaddr",
   "json",
   "jsonb",
 ] as const;

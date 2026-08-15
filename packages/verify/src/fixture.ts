@@ -29,6 +29,19 @@ create table parcels (
   blob_j json not null default '{"a":1}',
   blob_jb jsonb not null default '{"b":2}',
   state parcel_state not null default 'queued',
+  shipped_on date not null default '2026-02-03',
+  cutoff time not null default '13:45:10',
+  cutoff_tz timetz not null default '13:45:10+02',
+  transit interval not null default '1 day 02:00:00',
+  stamp bytea not null default '\\xdeadbeef',
+  source_ip inet not null default '192.168.0.1',
+  subnet cidr not null default '10.0.0.0/8',
+  device macaddr not null default '08:00:2b:01:02:03',
+  tags text[] not null default array['x','y'],
+  counts int4[] not null default array[1,2,3],
+  amounts numeric[] not null default array['1.50']::numeric[],
+  states parcel_state[] not null default array['queued']::parcel_state[],
+  grid int4[][] not null default array[array[1,2],array[3,4]],
   note text
 );
 

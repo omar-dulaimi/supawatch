@@ -31,9 +31,13 @@ function valibotExpr(runtime: RuntimeType): string {
       return "v.boolean()";
     case "date":
       return "v.date()";
+    case "bytes":
+      return "v.instance(Uint8Array)";
     case "json":
     case "unknown":
       return "v.unknown()";
+    case "array":
+      return `v.array(${valibotExpr(runtime.element)})`;
     case "enum": {
       const labels = runtime.labels.map((l) => JSON.stringify(l)).join(", ");
       return `v.picklist([${labels}])`;
@@ -51,9 +55,15 @@ function tsType(runtime: RuntimeType): string {
       return "boolean";
     case "date":
       return "Date";
+    case "bytes":
+      return "Uint8Array";
     case "json":
     case "unknown":
       return "unknown";
+    case "array": {
+      const el = tsType(runtime.element);
+      return el.includes("|") ? `(${el})[]` : `${el}[]`;
+    }
     case "enum":
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }

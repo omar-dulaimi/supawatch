@@ -31,9 +31,13 @@ function typeboxExpr(runtime: RuntimeType): string {
       return "Type.Boolean()";
     case "date":
       return "Type.Date()";
+    case "bytes":
+      return "Type.Uint8Array()";
     case "json":
     case "unknown":
       return "Type.Unknown()";
+    case "array":
+      return `Type.Array(${typeboxExpr(runtime.element)})`;
     case "enum": {
       const literals = runtime.labels
         .map((l) => `Type.Literal(${JSON.stringify(l)})`)
@@ -53,9 +57,15 @@ function tsType(runtime: RuntimeType): string {
       return "boolean";
     case "date":
       return "Date";
+    case "bytes":
+      return "Uint8Array";
     case "json":
     case "unknown":
       return "unknown";
+    case "array": {
+      const el = tsType(runtime.element);
+      return el.includes("|") ? `(${el})[]` : `${el}[]`;
+    }
     case "enum":
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }

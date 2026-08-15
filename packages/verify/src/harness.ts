@@ -87,10 +87,15 @@ function querierFromPglite(db: PGlite): Querier {
 
 // Build per-column wrong values from the runtime kind. Each one is a value
 // the driver can never produce for that column, so every target must
-// reject it. json and unknown accept anything and produce no negatives.
+// reject it. json and unknown accept anything and produce no negatives;
+// so does an array of unknown, which is the honest multidim mapping.
 function negativeValueFor(table: Table, colName: string): unknown | undefined {
   const col = table.columns.find((c) => c.name === colName)!;
-  switch (col.runtime.kind) {
+  return wrongValueFor(col.runtime);
+}
+
+function wrongValueFor(runtime: Table["columns"][number]["runtime"]): unknown | undefined {
+  switch (runtime.kind) {
     case "number":
       return "42";
     case "string":
@@ -99,12 +104,29 @@ function negativeValueFor(table: Table, colName: string): unknown | undefined {
       return "true";
     case "date":
       return "2026-01-01T00:00:00Z";
+    case "bytes":
+      return "deadbeef";
     case "enum":
       return "not_a_label";
+    case "array": {
+      // Two failure modes: not an array at all, or a wrong element.
+      // The scalar case here is the not-an-array one; the element-level
+      // negative is added separately below.
+      return "not-an-array";
+    }
     case "json":
     case "unknown":
       return undefined;
   }
+}
+
+function wrongElementFor(
+  runtime: Table["columns"][number]["runtime"],
+): unknown | undefined {
+  if (runtime.kind !== "array") return undefined;
+  const el = wrongValueFor(runtime.element);
+  if (el === undefined) return undefined;
+  return [el];
 }
 
 export async function runHarness(opts: {
@@ -186,6 +208,14 @@ export async function runHarness(opts: {
           value: { ...base, [col.name]: wrong },
           expectReject: true,
         });
+        const wrongElement = wrongElementFor(col.runtime);
+        if (wrongElement !== undefined) {
+          cases.push({
+            caseName: `${table.name}.${col.name}:wrong-element`,
+            value: { ...base, [col.name]: wrongElement },
+            expectReject: true,
+          });
+        }
         if (!col.nullable && col.runtime.kind !== "unknown" && col.runtime.kind !== "json") {
           cases.push({
             caseName: `${table.name}.${col.name}:null-in-not-null`,

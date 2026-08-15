@@ -18,6 +18,9 @@ create table orders (
   status order_status not null default 'pending',
   total numeric(10, 2) not null,
   totals split_total,
+  tags text[] not null default '{}',
+  expires_on date,
+  receipt bytea,
   metadata jsonb,
   placed_at timestamptz not null default now()
 );

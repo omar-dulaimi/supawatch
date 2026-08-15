@@ -26,9 +26,13 @@ function zodExpr(runtime: RuntimeType): string {
       return "z.boolean()";
     case "date":
       return "z.date()";
+    case "bytes":
+      return "z.instanceof(Uint8Array)"; // Buffer is a Uint8Array subclass
     case "json":
     case "unknown":
       return "z.unknown()";
+    case "array":
+      return `z.array(${zodExpr(runtime.element)})`;
     case "enum": {
       const labels = runtime.labels.map((l) => JSON.stringify(l)).join(", ");
       return `z.enum([${labels}])`;
@@ -47,9 +51,15 @@ function tsType(runtime: RuntimeType): string {
       return "boolean";
     case "date":
       return "Date";
+    case "bytes":
+      return "Uint8Array";
     case "json":
     case "unknown":
       return "unknown";
+    case "array": {
+      const el = tsType(runtime.element);
+      return el.includes("|") ? `(${el})[]` : `${el}[]`;
+    }
     case "enum":
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }

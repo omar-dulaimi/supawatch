@@ -4,11 +4,16 @@
 
 export type RuntimeType =
   | { kind: "number"; integer: boolean }
-  | { kind: "string"; format?: "uuid" | "numeric" | "bigint" | "composite" }
+  | {
+      kind: "string";
+      format?: "uuid" | "numeric" | "bigint" | "composite" | "array-literal";
+    }
   | { kind: "boolean" }
   | { kind: "date" }
+  | { kind: "bytes" }
   | { kind: "json" }
   | { kind: "enum"; labels: string[] }
+  | { kind: "array"; element: RuntimeType }
   | { kind: "unknown" };
 
 export interface Column {

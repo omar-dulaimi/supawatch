@@ -1,4 +1,4 @@
-import { runtimeFor } from "./runtime-map.js";
+import { arrayRuntimeFor, runtimeFor } from "./runtime-map.js";
 import type {
   Column,
   CompositeTypeInfo,
@@ -19,6 +19,10 @@ interface ColumnRow {
   type_kind: string;
   effective_type_name: string;
   effective_type_kind: string;
+  is_array: boolean;
+  declared_dims: number;
+  element_type_name: string | null;
+  element_type_kind: string | null;
   is_nullable: boolean;
   has_default: boolean;
 }
@@ -131,7 +135,7 @@ export async function introspect(
        join pg_type bt on bt.oid = src.typbasetype
      ),
      effective as (
-       select distinct on (start_oid) start_oid, typname, typtype
+       select distinct on (start_oid) start_oid, oid, typname, typtype
        from resolve
        where typtype <> 'd'
        order by start_oid, oid
@@ -146,6 +150,10 @@ export async function introspect(
        t.typtype::text as type_kind,
        eff.typname as effective_type_name,
        eff.typtype::text as effective_type_kind,
+       (eff_t.typcategory = 'A' and eff_t.typelem <> 0) as is_array,
+       greatest(a.attndims, 1) as declared_dims,
+       el_eff.typname as element_type_name,
+       el_eff.typtype::text as element_type_kind,
        not a.attnotnull as is_nullable,
        a.atthasdef as has_default
      from pg_class c
@@ -153,6 +161,9 @@ export async function introspect(
      join pg_attribute a on a.attrelid = c.oid
      join pg_type t on t.oid = a.atttypid
      join effective eff on eff.start_oid = t.oid
+     join pg_type eff_t on eff_t.oid = eff.oid
+     left join pg_type el on el.oid = eff_t.typelem and eff_t.typcategory = 'A'
+     left join effective el_eff on el_eff.start_oid = el.oid
      where n.nspname = any($1)
        and c.relkind = any($2)
        and a.attnum > 0
@@ -175,10 +186,21 @@ export async function introspect(
       tables.set(key, table);
     }
     // Runtime is decided from the EFFECTIVE type: a domain column
-    // behaves exactly as its base type at the driver level.
-    const runtime = runtimeFor(r.effective_type_name, r.effective_type_kind, {
-      enums: enumList,
-    });
+    // behaves exactly as its base type at the driver level. Array
+    // columns resolve their element the same way.
+    let runtime;
+    if (r.is_array && r.element_type_name) {
+      const element = runtimeFor(
+        r.element_type_name,
+        r.element_type_kind ?? "b",
+        { enums: enumList },
+      );
+      runtime = arrayRuntimeFor(element, r.declared_dims);
+    } else {
+      runtime = runtimeFor(r.effective_type_name, r.effective_type_kind, {
+        enums: enumList,
+      });
+    }
     const col: Column = {
       name: r.column_name,
       sqlType: r.sql_type,

@@ -17,25 +17,47 @@ export interface ArktypeTargetOptions extends TargetOptions {
   strict?: boolean;
 }
 
-// ArkType's field DSL is a string language; expressions below are always
-// full field-position strings, never mixed with Type-object combinators,
-// because the two are different languages and mixing them is a syntax
-// error in emitted code.
-function arkExpr(runtime: RuntimeType): string {
+// ArkType has two languages: the string DSL for field values, and Type
+// expressions. A field value may be either, but the two must never be
+// concatenated. Most kinds render as DSL strings; bytes renders as a
+// type.instanceOf expression, because the DSL keyword 'Uint8Array'
+// throws at parse time. The tagged return keeps the two apart.
+type ArkField =
+  | { lang: "dsl"; code: string }
+  | { lang: "expr"; code: string };
+
+function arkExpr(runtime: RuntimeType): ArkField {
   switch (runtime.kind) {
     case "number":
-      return runtime.integer ? "number.integer" : "number";
+      return { lang: "dsl", code: runtime.integer ? "number.integer" : "number" };
     case "string":
-      return runtime.format === "uuid" ? "string.uuid" : "string";
+      return {
+        lang: "dsl",
+        code: runtime.format === "uuid" ? "string.uuid" : "string",
+      };
     case "boolean":
-      return "boolean";
+      return { lang: "dsl", code: "boolean" };
     case "date":
-      return "Date";
+      return { lang: "dsl", code: "Date" };
+    case "bytes":
+      return { lang: "expr", code: "type.instanceOf(Uint8Array)" };
     case "json":
     case "unknown":
-      return "unknown";
+      return { lang: "dsl", code: "unknown" };
+    case "array": {
+      const el = arkExpr(runtime.element);
+      if (el.lang === "expr") return { lang: "expr", code: `${el.code}.array()` };
+      const needsParens = el.code.includes("|");
+      return {
+        lang: "dsl",
+        code: needsParens ? `(${el.code})[]` : `${el.code}[]`,
+      };
+    }
     case "enum":
-      return runtime.labels.map((l) => `'${l.replace(/'/g, "\\'")}'`).join("|");
+      return {
+        lang: "dsl",
+        code: runtime.labels.map((l) => `'${l.replace(/'/g, "\\'")}'`).join("|"),
+      };
   }
 }
 
@@ -49,9 +71,15 @@ function tsType(runtime: RuntimeType): string {
       return "boolean";
     case "date":
       return "Date";
+    case "bytes":
+      return "Uint8Array";
     case "json":
     case "unknown":
       return "unknown";
+    case "array": {
+      const el = tsType(runtime.element);
+      return el.includes("|") ? `(${el})[]` : `${el}[]`;
+    }
     case "enum":
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
@@ -61,13 +89,17 @@ export function exportNameFor(table: Table): string {
   return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Row";
 }
 
+// Returns the literal code for the field value: quoted DSL, or a raw
+// Type expression. Nullability composes inside each language.
 function fieldSchema(col: Column): string {
   const base = arkExpr(col.runtime);
-  // unknown already includes null.
-  if (col.nullable && col.runtime.kind !== "unknown" && col.runtime.kind !== "json") {
-    return `${base}|null`;
+  const nullable =
+    col.nullable && col.runtime.kind !== "unknown" && col.runtime.kind !== "json";
+  if (base.lang === "expr") {
+    return nullable ? `${base.code}.or("null")` : base.code;
   }
-  return base;
+  const dsl = nullable ? `${base.code}|null` : base.code;
+  return JSON.stringify(dsl);
 }
 
 export class ArktypeTarget implements Target<ArktypeTargetOptions> {
@@ -86,7 +118,7 @@ export class ArktypeTarget implements Target<ArktypeTargetOptions> {
   ): Rendered {
     const strict = opts.strict !== false;
     const fields = table.columns
-      .map((col) => `  ${JSON.stringify(col.name)}: ${JSON.stringify(fieldSchema(col))},`)
+      .map((col) => `  ${JSON.stringify(col.name)}: ${fieldSchema(col)},`)
       .join("\n");
     const rejectLine = strict ? `  "+": "reject",\n` : "";
     return {

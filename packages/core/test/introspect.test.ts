@@ -94,6 +94,46 @@ describe("introspect against a real Postgres (PGlite)", () => {
     expect(byName.ref.runtime).toEqual({ kind: "string", format: "uuid" });
   });
 
+  it("maps arrays from measured evidence: typed elements, raw-literal enum arrays, unknown multidim", async () => {
+    await db.exec(`
+      create domain label_text as text;
+      create table arr_probe (
+        id serial primary key,
+        tags text[] not null,
+        counts int4[] not null,
+        amounts numeric[] not null,
+        states order_status[] not null,
+        labels label_text[] not null,
+        grid int4[][] not null,
+        stamp bytea not null,
+        shipped_on date not null
+      );
+    `);
+    const s = await introspect(querierFromPglite(db));
+    const t = s.tables.find((x) => x.name === "arr_probe")!;
+    const by = Object.fromEntries(t.columns.map((c) => [c.name, c]));
+
+    expect(by.tags.runtime).toEqual({ kind: "array", element: { kind: "string" } });
+    expect(by.counts.runtime).toEqual({
+      kind: "array",
+      element: { kind: "number", integer: true },
+    });
+    expect(by.amounts.runtime).toEqual({
+      kind: "array",
+      element: { kind: "string", format: "numeric" },
+    });
+    // Both drivers hand enum arrays back as the raw literal "{a,b}".
+    expect(by.states.runtime).toEqual({ kind: "string", format: "array-literal" });
+    // Domain elements resolve to their base before the array wraps them.
+    expect(by.labels.runtime).toEqual({ kind: "array", element: { kind: "string" } });
+    // Postgres does not enforce declared dimensionality; multidim maps honestly.
+    expect(by.grid.runtime).toEqual({ kind: "array", element: { kind: "unknown" } });
+    expect(by.stamp.runtime).toEqual({ kind: "bytes" });
+    expect(by.shipped_on.runtime).toEqual({ kind: "date" });
+
+    await db.exec("drop table arr_probe; drop domain label_text;");
+  });
+
   it("falls back to unknown for unmapped types instead of guessing", async () => {
     await db.exec("create table exotic (rng int4range)");
     const next = await introspect(querierFromPglite(db));
