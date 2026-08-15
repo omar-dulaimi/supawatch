@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-supabase-types",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {
@@ -17,7 +17,9 @@
       "default": "./dist/index.js"
     }
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },

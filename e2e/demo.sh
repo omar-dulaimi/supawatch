@@ -43,26 +43,27 @@ echo "== 2b. Pack every package and install like a real consumer =="
 for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
+V=$(cd "$ROOT/packages/core" && node -p "require('./package.json').version")
 cat > out-work/package.json <<PKG
 {
   "name": "e2e-consumer",
   "private": true,
   "type": "module",
   "dependencies": {
-    "supawatch": "file:../tars/supawatch-0.1.0.tgz",
+    "supawatch": "file:../tars/supawatch-${V}.tgz",
     "@sinclair/typebox": "^0.34.0",
     "arktype": "^2.1.0",
     "valibot": "^1.1.0",
     "zod": "^4.0.0"
   },
   "overrides": {
-    "@supawatch/core": "file:../tars/supawatch-core-0.1.0.tgz",
-    "@supawatch/target-arktype": "file:../tars/supawatch-target-arktype-0.1.0.tgz",
-    "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-0.1.0.tgz",
-    "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-0.1.0.tgz",
-    "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-0.1.0.tgz",
-    "@supawatch/target-zod": "file:../tars/supawatch-target-zod-0.1.0.tgz",
-    "@supawatch/watch": "file:../tars/supawatch-watch-0.1.0.tgz"
+    "@supawatch/core": "file:../tars/supawatch-core-${V}.tgz",
+    "@supawatch/target-arktype": "file:../tars/supawatch-target-arktype-${V}.tgz",
+    "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V}.tgz",
+    "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V}.tgz",
+    "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V}.tgz",
+    "@supawatch/target-zod": "file:../tars/supawatch-target-zod-${V}.tgz",
+    "@supawatch/watch": "file:../tars/supawatch-watch-${V}.tgz"
   }
 }
 PKG
