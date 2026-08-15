@@ -36,6 +36,7 @@ export async function check(cfg: SupawatchConfig): Promise<Drift[]> {
       query: querierFrom(sql),
       schemas: cfg.schemas,
       includeViews: cfg.includeViews,
+      barrel: cfg.barrel,
       targets: await buildTargetRuns(cfg),
       source: manualSource(),
       sink,

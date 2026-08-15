@@ -53,8 +53,22 @@ export function diff(prev: Snapshot, next: Snapshot): string[] {
 
   const prevComposites = new Map(prev.composites.map((c) => [`${c.schema}.${c.name}`, c]));
   const nextComposites = new Map(next.composites.map((c) => [`${c.schema}.${c.name}`, c]));
-  for (const [k] of nextComposites) {
-    if (!prevComposites.has(k)) changes.push(`composite ${k} created`);
+  for (const [k, comp] of nextComposites) {
+    const prevC = prevComposites.get(k);
+    if (!prevC) {
+      changes.push(`composite ${k} created`);
+      continue;
+    }
+    const prevFields = new Map(prevC.fields.map((f) => [f.name, f]));
+    const nextFields = new Map(comp.fields.map((f) => [f.name, f]));
+    for (const [fname, f] of nextFields) {
+      if (!prevFields.has(fname)) {
+        changes.push(`composite ${k} gained ${fname} (${f.pgTypeName})`);
+      }
+    }
+    for (const [fname] of prevFields) {
+      if (!nextFields.has(fname)) changes.push(`composite ${k} lost ${fname}`);
+    }
   }
   for (const [k] of prevComposites) {
     if (!nextComposites.has(k)) changes.push(`composite ${k} dropped`);

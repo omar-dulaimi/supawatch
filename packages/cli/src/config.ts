@@ -10,6 +10,12 @@ function targetConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
     kind: z.literal(kind),
     path: z.string().optional(),
     strict: z.boolean().optional(),
+    emit: z
+      .object({
+        insert: z.boolean().optional(),
+        update: z.boolean().optional(),
+      })
+      .optional(),
   });
 }
 
@@ -34,6 +40,11 @@ export const ConfigSchema = z.object({
   // Views are included by default; Postgres reports every view column
   // as nullable, so their schemas are all-nullable and say so.
   includeViews: z.boolean().default(true),
+  barrel: z.boolean().default(true),
+  // Tightens DECLARED types of json/jsonb columns in .d.mts companions,
+  // keyed "table.column" or "schema.table.column". Runtime validation
+  // stays unknown: the catalog cannot verify what it does not enforce.
+  jsonTypes: z.record(z.string(), z.string()).optional(),
   source: SourceConfig,
   targets: z.array(TargetConfig).min(1),
 });

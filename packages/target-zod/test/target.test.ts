@@ -10,51 +10,68 @@ import { describe, expect, it } from "vitest";
 import { assemble, type Snapshot, type Table } from "@supawatch/core";
 import { ZodTarget } from "@supawatch/target-zod";
 
+const col = (partial: Partial<Table["columns"][number]> & { name: string }) =>
+  ({
+    sqlType: "text",
+    pgTypeName: "text",
+    runtime: { kind: "string" },
+    nullable: false,
+    hasDefault: false,
+    identity: null,
+    generated: false,
+    ...partial,
+  }) as Table["columns"][number];
+
 const ordersTable: Table = {
   schema: "public",
   name: "orders",
+  kind: "table",
   columns: [
-    {
+    col({
       name: "id",
       sqlType: "integer",
       pgTypeName: "int4",
       runtime: { kind: "number", integer: true },
-      nullable: false,
-      hasDefault: true,
-    },
-    {
+      identity: "always",
+    }),
+    col({
       name: "status",
       sqlType: "order_status",
       pgTypeName: "order_status",
       runtime: { kind: "enum", labels: ["pending", "paid"] },
-      nullable: false,
       hasDefault: true,
       enumRef: "order_status",
-    },
-    {
+    }),
+    col({
       name: "total",
       sqlType: "numeric(10,2)",
       pgTypeName: "numeric",
       runtime: { kind: "string", format: "numeric" },
-      nullable: false,
-      hasDefault: false,
-    },
-    {
+    }),
+    col({
       name: "placed_at",
       sqlType: "timestamptz",
       pgTypeName: "timestamptz",
       runtime: { kind: "date" },
-      nullable: false,
       hasDefault: true,
-    },
-    {
+    }),
+    col({
       name: "note",
-      sqlType: "text",
-      pgTypeName: "text",
       runtime: { kind: "string" },
       nullable: true,
-      hasDefault: false,
-    },
+    }),
+    col({
+      name: "search_blob",
+      runtime: { kind: "string" },
+      generated: true,
+    }),
+    col({
+      name: "meta",
+      sqlType: "jsonb",
+      pgTypeName: "jsonb",
+      runtime: { kind: "json" },
+      nullable: true,
+    }),
   ],
 };
 
@@ -91,6 +108,34 @@ describe("ZodTarget.renderTable", () => {
     expect(types).toContain('"note": string | null;');
     expect(types).toContain("export declare const ordersRow: z.ZodType<ordersRowType>;");
   });
+
+  it("insert excludes server-owned columns and marks defaults optional", () => {
+    const target = new ZodTarget();
+    const rendered = target.renderTable(ordersTable, snapshot, {
+      strict: true,
+      emit: { insert: true, update: true },
+    });
+    const insert = rendered.body.split("ordersInsert")[1].split("ordersUpdate")[0];
+    // identity-always and generated columns are not writable
+    expect(insert).not.toContain('"id"');
+    expect(insert).not.toContain('"search_blob"');
+    // default-bearing and nullable columns are optional; required stays bare
+    expect(insert).toContain('"status": z.enum(["pending", "paid"]).optional()');
+    expect(insert).toContain('"note": z.string().nullable().optional()');
+    expect(insert).toContain('"total": z.string(),');
+    // update: everything writable is optional
+    const update = rendered.body.split("ordersUpdate")[1];
+    expect(update).toContain('"total": z.string().optional()');
+  });
+
+  it("jsonTypes tightens the declared type only, runtime stays unknown", () => {
+    const target = new ZodTarget();
+    const jsonTypes = { "orders.meta": "{ source: string }" };
+    const types = target.renderTypes!(ordersTable, snapshot, { jsonTypes });
+    expect(types).toContain('"meta": { source: string } | null;');
+    const rendered = target.renderTable(ordersTable, snapshot, { jsonTypes });
+    expect(rendered.body).toContain('"meta": z.unknown().nullable()');
+  });
 });
 
 describe("ZodTarget.verifier against the emitted artifact", () => {
@@ -111,6 +156,8 @@ describe("ZodTarget.verifier against the emitted artifact", () => {
         total: "49.90",
         placed_at: new Date(),
         note: null,
+        search_blob: "paid 49.90",
+        meta: null,
       };
       expect(verifier.check(schema, goodRow)).toEqual({ ok: true });
 

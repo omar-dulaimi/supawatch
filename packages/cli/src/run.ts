@@ -16,7 +16,11 @@ export async function buildTargetRuns(cfg: SupawatchConfig): Promise<TargetRun[]
     const entry = entryFor(t.kind);
     const target = await loadTarget(entry);
     const { kind: _kind, path: _path, ...options } = t;
-    runs.push({ target, options, outDir: entry.outputDir(t, cfg) });
+    runs.push({
+      target,
+      options: { ...options, jsonTypes: cfg.jsonTypes },
+      outDir: entry.outputDir(t, cfg),
+    });
   }
   return runs;
 }
@@ -38,6 +42,7 @@ export async function generateOnce(cfg: SupawatchConfig): Promise<void> {
       query: querierFrom(sql),
       schemas: cfg.schemas,
       includeViews: cfg.includeViews,
+      barrel: cfg.barrel,
       targets: await buildTargetRuns(cfg),
       source: manualSource(),
     });
@@ -66,7 +71,7 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
       ? pollSource(query, {
           intervalMs: cfg.source.intervalMs,
           schemas: cfg.schemas,
-      includeViews: cfg.includeViews,
+          includeViews: cfg.includeViews,
         })
       : listenSource(sql, () =>
           console.log("[supawatch] idle, listening on schema_changed"),
@@ -75,6 +80,7 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
     query,
     schemas: cfg.schemas,
     includeViews: cfg.includeViews,
+    barrel: cfg.barrel,
     targets: await buildTargetRuns(cfg),
     source,
     debounceMs,

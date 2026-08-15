@@ -23,6 +23,10 @@ export interface Column {
   runtime: RuntimeType;
   nullable: boolean;
   hasDefault: boolean;
+  // 'always' identity and stored generated columns cannot be written;
+  // 'default' identity behaves like hasDefault for inserts.
+  identity: "always" | "default" | null;
+  generated: boolean;
   enumRef?: string;
 }
 
@@ -48,9 +52,16 @@ export interface DomainType {
   baseTypeName: string;
 }
 
+export interface CompositeField {
+  name: string;
+  pgTypeName: string;
+  runtime: RuntimeType;
+}
+
 export interface CompositeTypeInfo {
   schema: string;
   name: string;
+  fields: CompositeField[];
 }
 
 export interface Snapshot {
@@ -99,6 +110,14 @@ export interface TargetCapabilities {
 
 export interface TargetOptions {
   strict?: boolean;
+  // Emit insert/update variants alongside the row schema. Off by
+  // default; the select-row shape is the only one ground truth can
+  // verify against real rows.
+  emit?: { insert?: boolean; update?: boolean };
+  // Tighten the DECLARED type of a json/jsonb column in the .d.mts
+  // companion. Runtime validation stays unknown on purpose: the
+  // catalog cannot verify a shape the database does not enforce.
+  jsonTypes?: Record<string, string>;
 }
 
 export interface Target<TOptions extends TargetOptions = TargetOptions> {

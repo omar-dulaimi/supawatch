@@ -25,6 +25,8 @@ interface ColumnRow {
   element_type_kind: string | null;
   is_nullable: boolean;
   has_default: boolean;
+  identity_kind: string;
+  is_generated: boolean;
 }
 
 interface EnumRow {
@@ -42,6 +44,9 @@ interface DomainRow {
 interface CompositeRow {
   composite_schema: string;
   composite_name: string;
+  field_name: string;
+  field_type_name: string;
+  field_type_kind: string;
 }
 
 export interface IntrospectOptions {
@@ -109,20 +114,40 @@ export async function introspect(
   }));
 
   // Standalone composites only: every table also has a rowtype with
-  // typtype 'c', filtered out via the owning relation's relkind.
+  // typtype 'c', filtered out via the owning relation's relkind. Fields
+  // come from the composite's own pg_attribute rows, and their runtimes
+  // resolve like column runtimes so a future parser has the true shapes,
+  // even while a composite COLUMN's schema stays a string.
   const compositeRows = await query<CompositeRow>(
-    `select n.nspname as composite_schema, t.typname as composite_name
+    `select n.nspname as composite_schema, t.typname as composite_name,
+       a.attname as field_name, ft.typname as field_type_name,
+       ft.typtype::text as field_type_kind
      from pg_type t
      join pg_namespace n on n.oid = t.typnamespace
      join pg_class c on c.oid = t.typrelid
+     join pg_attribute a on a.attrelid = c.oid and a.attnum > 0 and not a.attisdropped
+     join pg_type ft on ft.oid = a.atttypid
      where t.typtype = 'c' and c.relkind = 'c' and n.nspname = any($1)
-     order by t.typname`,
+     order by t.typname, a.attnum`,
     [schemas],
   );
-  const composites: CompositeTypeInfo[] = compositeRows.map((r) => ({
-    schema: r.composite_schema,
-    name: r.composite_name,
-  }));
+  const compositeMap = new Map<string, CompositeTypeInfo>();
+  for (const r of compositeRows) {
+    const key = `${r.composite_schema}.${r.composite_name}`;
+    let comp = compositeMap.get(key);
+    if (!comp) {
+      comp = { schema: r.composite_schema, name: r.composite_name, fields: [] };
+      compositeMap.set(key, comp);
+    }
+    comp.fields.push({
+      name: r.field_name,
+      pgTypeName: r.field_type_name,
+      runtime: runtimeFor(r.field_type_name, r.field_type_kind, {
+        enums: enumList,
+      }),
+    });
+  }
+  const composites: CompositeTypeInfo[] = [...compositeMap.values()];
 
   const columnRows = await query<ColumnRow>(
     `with recursive resolve as (
@@ -155,7 +180,9 @@ export async function introspect(
        el_eff.typname as element_type_name,
        el_eff.typtype::text as element_type_kind,
        not a.attnotnull as is_nullable,
-       a.atthasdef as has_default
+       a.atthasdef as has_default,
+       a.attidentity::text as identity_kind,
+       (a.attgenerated <> '') as is_generated
      from pg_class c
      join pg_namespace n on n.oid = c.relnamespace
      join pg_attribute a on a.attrelid = c.oid
@@ -208,6 +235,13 @@ export async function introspect(
       runtime,
       nullable: r.is_nullable,
       hasDefault: r.has_default,
+      identity:
+        r.identity_kind === "a"
+          ? "always"
+          : r.identity_kind === "d"
+            ? "default"
+            : null,
+      generated: r.is_generated,
     };
     if (runtime.kind === "enum") col.enumRef = r.effective_type_name;
     table.columns.push(col);

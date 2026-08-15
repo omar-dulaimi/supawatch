@@ -83,8 +83,9 @@ export default defineConfig({
   schemas: ["public"],
   outDir: "$OUT",
   source: { kind: "listen", debounceMs: 300 },
+  jsonTypes: { "orders.metadata": "{ source?: string; coupon?: string }" },
   targets: [
-    { kind: "zod", strict: true },
+    { kind: "zod", strict: true, emit: { insert: true, update: true } },
     { kind: "valibot", strict: true },
     { kind: "arktype", strict: true },
     { kind: "typebox", strict: true },
@@ -145,6 +146,13 @@ awk 'index($0, "\"receipt\": z.instanceof(Uint8Array).nullable()") { f = 1 } END
 awk 'index($0, "\"email\": z.string()") { f = 1 } END { exit !f }' "$OUT/zod/users.mjs" || fail "domain column not resolved to base string"
 [ -f "$OUT/zod/paid_orders.mjs" ] || fail "view paid_orders not emitted"
 [ -f "$OUT/zod/refunded_orders.mjs" ] || fail "live-created view not emitted"
+[ -f "$OUT/zod/index.mjs" ] || fail "zod barrel missing"
+awk 'index($0, "./orders.mjs") { f = 1 } END { exit !f }' "$OUT/zod/index.mjs" || fail "barrel lacks orders entry"
+awk 'index($0, "ordersInsert") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "insert variant missing"
+awk 'index($0, "\"id\": z.number().int().optional()") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "serial id not optional in insert"
+awk 'index($0, "ordersUpdate") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "update variant missing"
+awk 'index($0, "source?: string") { f = 1 } END { exit !f }' "$OUT/zod/orders.d.mts" || fail "jsonTypes override missing from d.mts"
+node -e "import('file://$OUT/zod/index.mjs').then((m) => { if (!m.ordersRow || !m.usersRow || !m.ordersInsert) { console.error('barrel exports incomplete'); process.exit(1); } })" || fail "barrel does not import cleanly"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"
