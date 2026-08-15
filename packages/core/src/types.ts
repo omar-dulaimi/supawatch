@@ -30,9 +30,18 @@ export interface Column {
   enumRef?: string;
 }
 
+export interface ForeignKey {
+  name: string;
+  columns: string[];
+  referencedSchema: string;
+  referencedTable: string;
+  referencedColumns: string[];
+}
+
 export interface Table {
   schema: string;
   name: string;
+  foreignKeys: ForeignKey[];
   // Views are tables to a reader; the marker exists because Postgres
   // reports every view column as nullable regardless of the underlying
   // column, and consumers deserve to know that is why.
@@ -120,11 +129,21 @@ export interface TargetOptions {
   jsonTypes?: Record<string, string>;
 }
 
+export interface SnapshotFile {
+  file: string;
+  content: string;
+}
+
 export interface Target<TOptions extends TargetOptions = TargetOptions> {
   readonly name: string;
   readonly capabilities: TargetCapabilities;
   readonly fileExtension: string;
   renderTable(table: Table, snapshot: Snapshot, opts: TOptions): Rendered;
   renderTypes?(table: Table, snapshot: Snapshot, opts: TOptions): string;
-  verifier(): Verifier;
+  // A snapshot-level target (like the supabase Database bridge) emits
+  // whole files instead of per-table schemas; the watcher then skips
+  // per-table emit, barrels, and row verification for it.
+  renderSnapshot?(snapshot: Snapshot, opts: TOptions): SnapshotFile[];
+  // Absent on type-only targets; row verification is skipped for them.
+  verifier?(): Verifier;
 }

@@ -26,6 +26,9 @@ importers:
       '@supawatch/target-arktype':
         specifier: workspace:*
         version: link:../target-arktype
+      '@supawatch/target-supabase-types':
+        specifier: workspace:*
+        version: link:../target-supabase-types
       '@supawatch/target-typebox':
         specifier: workspace:*
         version: link:../target-typebox
@@ -72,6 +75,19 @@ importers:
       arktype:
         specifier: ^2.1.0
         version: 2.2.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
+  packages/target-supabase-types:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^22.20.1

@@ -1,5 +1,14 @@
 import type { RuntimeType, Snapshot } from "./types.js";
 
+// Two measured runtime profiles. postgres-js is the tagged-template
+// driver used by the watcher itself; supabase-js is PostgREST's JSON,
+// measured live against postgrest/postgrest (scripts/probe-postgrest.sh):
+// numeric arrives as a JSON number, int8 as a JSON number WITH PRECISION
+// LOSS beyond 2^53 (the probe watched 9007199254740993 arrive as
+// 9007199254740992), dates and timestamps as strings, bytea as the
+// hex-escaped string "\\xdeadbeef", and enum arrays as real arrays.
+export type DriverProfile = "postgres-js" | "supabase-js";
+
 // One table, in one place, mapping a pg type name to what the driver hands
 // JavaScript. Every row here must be exercised by a verification test that
 // checks a real driver return value; a row nobody has verified does not
@@ -8,6 +17,7 @@ export function runtimeFor(
   pgTypeName: string,
   typeKind: string,
   snapshot: Pick<Snapshot, "enums">,
+  profile: DriverProfile = "postgres-js",
 ): RuntimeType {
   if (typeKind === "e") {
     const e = snapshot.enums.find((x) => x.name === pgTypeName);
@@ -18,6 +28,20 @@ export function runtimeFor(
   // would fail ground truth; string is the honest mapping.
   if (typeKind === "c") {
     return { kind: "string", format: "composite" };
+  }
+  if (profile === "supabase-js") {
+    switch (pgTypeName) {
+      case "numeric":
+        return { kind: "number", integer: false };
+      case "int8":
+        return { kind: "number", integer: true }; // precision loss past 2^53, measured
+      case "timestamptz":
+      case "timestamp":
+      case "date":
+        return { kind: "string" };
+      case "bytea":
+        return { kind: "string" }; // hex-escaped "\\x..." over JSON
+    }
   }
   switch (pgTypeName) {
     case "int2":
@@ -61,16 +85,18 @@ export function runtimeFor(
 
 // Arrays, decided from measured evidence:
 // - element-typed JS arrays for scalar elements, elements following the
-//   same driver truth (numeric[] arrives as string[]),
-// - EXCEPT enum arrays, which BOTH drivers hand back as the raw literal
-//   string "{a,b}", unparsed,
+//   same driver truth (numeric[] arrives as string[] under postgres-js,
+//   number[] under the PostgREST JSON profile),
+// - enum arrays: BOTH native drivers hand back the raw literal string
+//   "{a,b}", unparsed, while PostgREST parses them into real arrays,
 // - and Postgres does not enforce declared dimensionality; a column
 //   declared with more than one dimension maps to array of unknown.
 export function arrayRuntimeFor(
   elementRuntime: RuntimeType,
   declaredDims: number,
+  profile: DriverProfile = "postgres-js",
 ): RuntimeType {
-  if (elementRuntime.kind === "enum") {
+  if (elementRuntime.kind === "enum" && profile === "postgres-js") {
     return { kind: "string", format: "array-literal" };
   }
   if (declaredDims > 1) {

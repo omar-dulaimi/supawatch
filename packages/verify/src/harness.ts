@@ -146,9 +146,17 @@ export async function runHarness(opts: {
     // Emit every target's schemas once, into workDir/<target>/.
     const loaded = new Map<
       string,
-      { schemaByTable: Map<string, unknown>; verifier: ReturnType<Target["verifier"]> }
+      {
+        schemaByTable: Map<string, unknown>;
+        verifier: import("@supawatch/core").Verifier;
+      }
     >();
     for (const { target, options } of opts.targets) {
+      if (!target.verifier) {
+        throw new Error(
+          `harness target ${target.name} has no verifier; type-only targets do not belong in the harness`,
+        );
+      }
       const dir = path.join(opts.workDir, target.name);
       const verifier = target.verifier();
       const schemaByTable = new Map<string, unknown>();

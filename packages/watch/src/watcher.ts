@@ -22,6 +22,7 @@ export interface WatcherOptions {
   query: Querier;
   schemas?: string[];
   includeViews?: boolean;
+  profile?: import("@supawatch/core").DriverProfile;
   targets: TargetRun[];
   source: TriggerSource;
   sink?: FileSink;
@@ -107,6 +108,7 @@ export class Watcher {
   private async cycle(isBaseline: boolean): Promise<CycleResult> {
     const next = await introspect(this.opts.query, this.opts.schemas, {
       includeViews: this.opts.includeViews,
+      profile: this.opts.profile,
     });
     const changes = this.last ? diff(this.last, next) : [];
     if (!isBaseline && changes.length === 0) {
@@ -124,6 +126,20 @@ export class Watcher {
       multiSchema ? `${t.schema}.${t.name}` : t.name;
 
     for (const run of this.opts.targets) {
+      // Snapshot-level targets (the Database bridge) emit whole files;
+      // no per-table schemas, no barrel, no row verification.
+      if (run.target.renderSnapshot) {
+        const emitted = run.target.renderSnapshot(next, run.options);
+        const keepSnap = new Set<string>();
+        for (const f of emitted) {
+          const file = path.join(run.outDir, f.file);
+          await this.sink.write(file, f.content);
+          keepSnap.add(f.file);
+          files.push(file);
+        }
+        await this.sink.prune(run.outDir, keepSnap, run.target.fileExtension);
+        continue;
+      }
       const keep = new Set<string>();
       for (const table of next.tables) {
         const rendered = run.target.renderTable(table, next, run.options);
@@ -141,7 +157,15 @@ export class Watcher {
           );
         }
 
-        if (this.opts.verifyRows !== false) {
+        // Row verification measures the postgres-js profile; rows
+        // fetched here come from postgres.js, so schemas generated for
+        // the PostgREST JSON profile would rightly reject them. The e2e
+        // verifies that profile against real PostgREST responses.
+        if (
+          this.opts.verifyRows !== false &&
+          (this.opts.profile ?? "postgres-js") === "postgres-js" &&
+          run.target.verifier
+        ) {
           const v = await this.verifyTable(run, table, file, rendered.exportName);
           verified.push(v);
         }
@@ -178,7 +202,7 @@ export class Watcher {
     file: string,
     exportName: string,
   ) {
-    const verifier = run.target.verifier();
+    const verifier = run.target.verifier!();
     const schema = await verifier.load(file, exportName);
     const ident = `"${table.schema.replace(/"/g, '""')}"."${table.name.replace(/"/g, '""')}"`;
     const rows = await this.opts.query(`select * from ${ident} limit 10`);

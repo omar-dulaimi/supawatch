@@ -40,7 +40,7 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot target-arktype target-typebox watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 cat > out-work/package.json <<PKG
@@ -58,6 +58,7 @@ cat > out-work/package.json <<PKG
   "overrides": {
     "@supawatch/core": "file:../tars/supawatch-core-0.1.0.tgz",
     "@supawatch/target-arktype": "file:../tars/supawatch-target-arktype-0.1.0.tgz",
+    "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-0.1.0.tgz",
     "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-0.1.0.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-0.1.0.tgz",
     "@supawatch/target-zod": "file:../tars/supawatch-target-zod-0.1.0.tgz",
@@ -163,6 +164,65 @@ fi
 awk 'index($0, "drift (stale)") { f = 1 } END { exit !f }' check-drift.log || fail "check did not name the stale file"
 (cd out-work && "$CLI" generate >/dev/null) || fail "generate could not repair drift"
 (cd out-work && "$CLI" check) || fail "check still drifting after regenerate"
+
+echo "== 11. supabase-js profile: generate for PostgREST and verify against the real thing =="
+PROUT="$ROOT/e2e/out-work/generated-postgrest"
+cat > out-work/supawatch.config.ts <<CFG
+import { defineConfig } from "supawatch";
+
+export default defineConfig({
+  schemas: ["public"],
+  outDir: "$PROUT",
+  profile: "supabase-js",
+  source: { kind: "manual" },
+  targets: [{ kind: "zod", strict: true }, { kind: "supabase-types" }],
+});
+CFG
+(cd out-work && "$CLI" generate) || fail "supabase-js profile generate failed"
+[ -f "$PROUT/database.types.ts" ] || fail "database.types.ts missing"
+awk 'index($0, "export interface Database") { f = 1 } END { exit !f }' "$PROUT/database.types.ts" || fail "Database interface missing"
+awk 'index($0, "orders_user_id_fkey") { f = 1 } END { exit !f }' "$PROUT/database.types.ts" || fail "FK relationship missing"
+awk 'index($0, "order_status:") { f = 1 } END { exit !f }' "$PROUT/database.types.ts" || fail "enum missing from bridge"
+awk 'index($0, "total: number;") { f = 1 } END { exit !f }' "$PROUT/database.types.ts" || fail "numeric not number in bridge Row"
+awk 'index($0, "\"total\": z.number()") { f = 1 } END { exit !f }' "$PROUT/zod/orders.mjs" || fail "profile zod schema still string for numeric"
+
+echo "== 11b. Ground truth for the profile: parse real PostgREST JSON =="
+docker exec -i supawatch-e2e-pg psql -U postgres -d e2e -v ON_ERROR_STOP=1 <<'SQL' >/dev/null
+do $$ begin
+  if exists (select from pg_roles where rolname = 'web_anon') then
+    execute 'drop owned by web_anon';
+    execute 'drop role web_anon';
+  end if;
+end $$;
+create role web_anon nologin;
+grant usage on schema public to web_anon;
+grant select on all tables in schema public to web_anon;
+SQL
+docker rm -f supawatch-postgrest >/dev/null 2>&1 || true
+docker run -d --rm --name supawatch-postgrest --network e2e_default -p 3001:3000 \
+  -e PGRST_DB_URI="postgres://postgres:e2e@db:5432/e2e" \
+  -e PGRST_DB_SCHEMAS="public" \
+  -e PGRST_DB_ANON_ROLE="web_anon" \
+  postgrest/postgrest >/dev/null
+trap 'docker rm -f supawatch-postgrest >/dev/null 2>&1 || true' EXIT
+for i in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -sf http://localhost:3001/orders >/dev/null 2>&1; then break; fi
+  sleep 1
+done
+(cd out-work && node -e '
+const schemaUrl = "file://" + process.argv[1] + "/zod/orders.mjs";
+Promise.all([import(schemaUrl), fetch("http://localhost:3001/orders").then((r) => r.json())])
+  .then(([mod, rows]) => {
+    if (!Array.isArray(rows) || rows.length === 0) { console.error("no rows from postgrest"); process.exit(1); }
+    for (const row of rows) {
+      const v = mod.ordersRow.safeParse(row);
+      if (!v.success) { console.error("profile ground truth FAILED:", v.error.issues[0]); process.exit(1); }
+    }
+    console.log(`profile ground truth: ${rows.length}/${rows.length} PostgREST rows passed`);
+  });
+' "$PROUT") || fail "generated supabase-js schema rejected real PostgREST rows"
+docker rm -f supawatch-postgrest >/dev/null 2>&1 || true
+trap - EXIT
 
 echo
 echo "================ watch.log ================"

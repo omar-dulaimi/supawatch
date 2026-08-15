@@ -43,6 +43,7 @@ export async function generateOnce(cfg: SupawatchConfig): Promise<void> {
       schemas: cfg.schemas,
       includeViews: cfg.includeViews,
       barrel: cfg.barrel,
+      profile: cfg.profile,
       targets: await buildTargetRuns(cfg),
       source: manualSource(),
     });
@@ -81,6 +82,7 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
     schemas: cfg.schemas,
     includeViews: cfg.includeViews,
     barrel: cfg.barrel,
+    profile: cfg.profile,
     targets: await buildTargetRuns(cfg),
     source,
     debounceMs,

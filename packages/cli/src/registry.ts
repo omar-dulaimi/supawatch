@@ -44,6 +44,14 @@ export const TARGETS: readonly TargetEntry[] = [
       new (m as { TypeboxTarget: new () => Target }).TypeboxTarget(),
     outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "typebox"),
   },
+  {
+    kind: "supabase-types",
+    specifier: "@supawatch/target-supabase-types",
+    load: () => import("@supawatch/target-supabase-types"),
+    construct: (m) =>
+      new (m as { SupabaseTypesTarget: new () => Target }).SupabaseTypesTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
 ];
 
 export function entryFor(kind: TargetConfigItem["kind"]): TargetEntry {

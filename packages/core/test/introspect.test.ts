@@ -134,6 +134,36 @@ describe("introspect against a real Postgres (PGlite)", () => {
     await db.exec("drop table arr_probe; drop domain label_text;");
   });
 
+  it("supabase-js profile: measured PostgREST JSON deltas", async () => {
+    await db.exec(`
+      create table pr_probe (
+        big int8 not null,
+        price numeric(8,2) not null,
+        seen_at timestamptz not null,
+        shipped_on date not null,
+        stamp bytea not null,
+        states order_status[] not null
+      );
+    `);
+    const s = await introspect(querierFromPglite(db), ["public"], {
+      profile: "supabase-js",
+    });
+    const t = s.tables.find((x) => x.name === "pr_probe")!;
+    const by = Object.fromEntries(t.columns.map((c) => [c.name, c]));
+
+    expect(by.big.runtime).toEqual({ kind: "number", integer: true });
+    expect(by.price.runtime).toEqual({ kind: "number", integer: false });
+    expect(by.seen_at.runtime).toEqual({ kind: "string" });
+    expect(by.shipped_on.runtime).toEqual({ kind: "string" });
+    expect(by.stamp.runtime).toEqual({ kind: "string" });
+    // PostgREST parses enum arrays into real arrays, unlike both drivers.
+    expect(by.states.runtime).toEqual({
+      kind: "array",
+      element: { kind: "enum", labels: ["pending", "paid", "shipped"] },
+    });
+    await db.exec("drop table pr_probe");
+  });
+
   it("falls back to unknown for unmapped types instead of guessing", async () => {
     await db.exec("create table exotic (rng int4range)");
     const next = await introspect(querierFromPglite(db));

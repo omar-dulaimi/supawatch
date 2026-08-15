@@ -1,9 +1,10 @@
-import { arrayRuntimeFor, runtimeFor } from "./runtime-map.js";
+import { arrayRuntimeFor, runtimeFor, type DriverProfile } from "./runtime-map.js";
 import type {
   Column,
   CompositeTypeInfo,
   DomainType,
   EnumType,
+  ForeignKey,
   Querier,
   Snapshot,
   Table,
@@ -51,6 +52,7 @@ interface CompositeRow {
 
 export interface IntrospectOptions {
   includeViews?: boolean;
+  profile?: DriverProfile;
 }
 
 export async function introspect(
@@ -59,6 +61,7 @@ export async function introspect(
   opts: IntrospectOptions = {},
 ): Promise<Snapshot> {
   const includeViews = opts.includeViews !== false;
+  const profile = opts.profile ?? "postgres-js";
   const relkinds = includeViews ? ["r", "v"] : ["r"];
 
   const enumRows = await query<EnumRow>(
@@ -142,9 +145,12 @@ export async function introspect(
     comp.fields.push({
       name: r.field_name,
       pgTypeName: r.field_type_name,
-      runtime: runtimeFor(r.field_type_name, r.field_type_kind, {
-        enums: enumList,
-      }),
+      runtime: runtimeFor(
+        r.field_type_name,
+        r.field_type_kind,
+        { enums: enumList },
+        profile,
+      ),
     });
   }
   const composites: CompositeTypeInfo[] = [...compositeMap.values()];
@@ -199,6 +205,51 @@ export async function introspect(
     [schemas, relkinds],
   );
 
+  const fkRows = await query<{
+    table_schema: string;
+    table_name: string;
+    fk_name: string;
+    columns: string[];
+    ref_schema: string;
+    ref_table: string;
+    ref_columns: string[];
+  }>(
+    `select
+       n.nspname as table_schema,
+       c.relname as table_name,
+       con.conname as fk_name,
+       array_agg(a.attname order by ord.n) as columns,
+       rn.nspname as ref_schema,
+       rc.relname as ref_table,
+       array_agg(ra.attname order by ord.n) as ref_columns
+     from pg_constraint con
+     join pg_class c on c.oid = con.conrelid
+     join pg_namespace n on n.oid = c.relnamespace
+     join pg_class rc on rc.oid = con.confrelid
+     join pg_namespace rn on rn.oid = rc.relnamespace
+     join lateral unnest(con.conkey, con.confkey) with ordinality
+       as ord(attnum, ref_attnum, n) on true
+     join pg_attribute a on a.attrelid = c.oid and a.attnum = ord.attnum
+     join pg_attribute ra on ra.attrelid = rc.oid and ra.attnum = ord.ref_attnum
+     where con.contype = 'f' and n.nspname = any($1)
+     group by n.nspname, c.relname, con.conname, rn.nspname, rc.relname
+     order by c.relname, con.conname`,
+    [schemas],
+  );
+  const fksByTable = new Map<string, ForeignKey[]>();
+  for (const r of fkRows) {
+    const key = `${r.table_schema}.${r.table_name}`;
+    const list = fksByTable.get(key) ?? [];
+    list.push({
+      name: r.fk_name,
+      columns: r.columns,
+      referencedSchema: r.ref_schema,
+      referencedTable: r.ref_table,
+      referencedColumns: r.ref_columns,
+    });
+    fksByTable.set(key, list);
+  }
+
   const tables = new Map<string, Table>();
   for (const r of columnRows) {
     const key = `${r.table_schema}.${r.table_name}`;
@@ -208,6 +259,7 @@ export async function introspect(
         schema: r.table_schema,
         name: r.table_name,
         kind: r.rel_kind === "v" ? "view" : "table",
+        foreignKeys: fksByTable.get(key) ?? [],
         columns: [],
       };
       tables.set(key, table);
@@ -221,12 +273,16 @@ export async function introspect(
         r.element_type_name,
         r.element_type_kind ?? "b",
         { enums: enumList },
+        profile,
       );
-      runtime = arrayRuntimeFor(element, r.declared_dims);
+      runtime = arrayRuntimeFor(element, r.declared_dims, profile);
     } else {
-      runtime = runtimeFor(r.effective_type_name, r.effective_type_kind, {
-        enums: enumList,
-      });
+      runtime = runtimeFor(
+        r.effective_type_name,
+        r.effective_type_kind,
+        { enums: enumList },
+        profile,
+      );
     }
     const col: Column = {
       name: r.column_name,

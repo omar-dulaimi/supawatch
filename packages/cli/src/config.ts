@@ -3,7 +3,7 @@ import { z } from "zod";
 
 // One kind enum feeds the config parser and --only. A discriminated union
 // per kind from day one, the direct fix for drzl's flat 27-kind object.
-export const TARGET_KINDS = ["zod", "valibot", "arktype", "typebox"] as const;
+export const TARGET_KINDS = ["zod", "valibot", "arktype", "typebox", "supabase-types"] as const;
 
 function targetConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
   return z.object({
@@ -19,11 +19,17 @@ function targetConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
   });
 }
 
+const SupabaseTypesConfig = z.object({
+  kind: z.literal("supabase-types"),
+  path: z.string().optional(),
+});
+
 const TargetConfig = z.discriminatedUnion("kind", [
   targetConfigFor("zod"),
   targetConfigFor("valibot"),
   targetConfigFor("arktype"),
   targetConfigFor("typebox"),
+  SupabaseTypesConfig,
 ]);
 
 const SourceConfig = z
@@ -41,6 +47,11 @@ export const ConfigSchema = z.object({
   // as nullable, so their schemas are all-nullable and say so.
   includeViews: z.boolean().default(true),
   barrel: z.boolean().default(true),
+  // Which measured runtime profile schemas target: postgres-js (the
+  // tagged-template driver) or supabase-js (PostgREST's JSON). Under
+  // supabase-js, driver-row verification is skipped; the e2e verifies
+  // that profile against real PostgREST responses.
+  profile: z.enum(["postgres-js", "supabase-js"]).default("postgres-js"),
   // Tightens DECLARED types of json/jsonb columns in .d.mts companions,
   // keyed "table.column" or "schema.table.column". Runtime validation
   // stays unknown: the catalog cannot verify what it does not enforce.
