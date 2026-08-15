@@ -1,0 +1,54 @@
+name: release
+
+on:
+  push:
+    branches: [main]
+
+concurrency: release-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+
+      # The gate lives INSIDE the release job on purpose: the changesets
+      # "Version Packages" PR triggers no CI of its own (GITHUB_TOKEN
+      # recursion guard), so nothing else stands between a bad merge and
+      # a publish.
+      - name: Gate (unit tests)
+        run: pnpm run test
+
+      - name: Gate (e2e)
+        run: pnpm run e2e
+
+      - name: Stop e2e database
+        if: always()
+        run: docker compose -f e2e/docker-compose.yml down
+
+      - name: Version or publish
+        uses: changesets/action@v1
+        with:
+          publish: pnpm changeset publish
+          commit: "release: version packages"
+          title: "release: version packages"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

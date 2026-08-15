@@ -9,11 +9,14 @@
     "gate": "pnpm run test && pnpm run e2e"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.1",
     "@electric-sql/pglite": "^0.3.0",
     "typescript": "^5.9.0",
     "vitest": "^3.0.0"
   },
   "pnpm": {
-    "allowBuilds": ["esbuild"]
+    "allowBuilds": [
+      "esbuild"
+    ]
   }
 }
