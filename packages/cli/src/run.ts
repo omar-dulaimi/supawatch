@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import postgres from "postgres";
 import {
   listenSource,
@@ -26,13 +28,31 @@ export async function buildTargetRuns(cfg: SupawatchConfig): Promise<TargetRun[]
 }
 
 export function connect(): postgres.Sql {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL ?? readDotEnvDatabaseUrl();
   if (!url) {
     throw new Error(
-      "DATABASE_URL is not set; supawatch reads the connection from the environment only",
+      "DATABASE_URL is not set; export it or put DATABASE_URL=... in ./.env",
     );
   }
   return postgres(url, { max: 2 });
+}
+
+// Real projects keep DATABASE_URL in .env; found by dogfooding that
+// exporting it per command is genuine friction. Minimal parse on
+// purpose: one flat file, KEY=VALUE lines, optional quotes, no
+// expansion and no cascade of .env.local variants.
+export function readDotEnvDatabaseUrl(cwd = process.cwd()): string | undefined {
+  let text: string;
+  try {
+    text = readFileSync(path.join(cwd, ".env"), "utf8");
+  } catch {
+    return undefined;
+  }
+  for (const line of text.split("\n")) {
+    const m = /^\s*DATABASE_URL\s*=\s*("([^"]*)"|'([^']*)'|(.*?))\s*$/.exec(line);
+    if (m) return m[2] ?? m[3] ?? m[4] ?? undefined;
+  }
+  return undefined;
 }
 
 export async function generateOnce(cfg: SupawatchConfig): Promise<void> {

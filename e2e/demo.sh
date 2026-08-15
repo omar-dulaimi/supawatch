@@ -149,6 +149,7 @@ awk 'index($0, "\"email\": z.string()") { f = 1 } END { exit !f }' "$OUT/zod/use
 [ -f "$OUT/zod/paid_orders.mjs" ] || fail "view paid_orders not emitted"
 [ -f "$OUT/zod/refunded_orders.mjs" ] || fail "live-created view not emitted"
 [ -f "$OUT/zod/index.mjs" ] || fail "zod barrel missing"
+[ -f "$OUT/zod/index.d.mts" ] || fail "zod declaration barrel missing"
 awk 'index($0, "./orders.mjs") { f = 1 } END { exit !f }' "$OUT/zod/index.mjs" || fail "barrel lacks orders entry"
 awk 'index($0, "ordersInsert") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "insert variant missing"
 awk 'index($0, "\"id\": z.number().int().optional()") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "serial id not optional in insert"

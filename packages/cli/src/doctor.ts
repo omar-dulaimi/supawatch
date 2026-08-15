@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { loadConfig } from "./config.js";
+import { readDotEnvDatabaseUrl } from "./run.js";
 import { entryFor, loadTarget } from "./registry.js";
 
 interface CheckResult {
@@ -12,12 +13,16 @@ interface CheckResult {
 // the real thing: the LISTEN check round-trips an actual notification.
 export async function doctor(cwd: string): Promise<boolean> {
   const results: CheckResult[] = [];
-  const url = process.env.DATABASE_URL;
+  const url = process.env.DATABASE_URL ?? readDotEnvDatabaseUrl();
 
   results.push({
     name: "DATABASE_URL",
     ok: Boolean(url),
-    detail: url ? "set" : "not set in the environment",
+    detail: url
+      ? process.env.DATABASE_URL
+        ? "set"
+        : "read from ./.env"
+      : "not set in the environment or ./.env",
   });
 
   let sql: postgres.Sql | undefined;

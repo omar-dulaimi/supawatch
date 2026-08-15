@@ -72,6 +72,28 @@ describe("Watcher cycle against real Postgres (PGlite)", () => {
     expect(regenerated).toContain('"tag": z.string().nullable()');
   });
 
+  it("ships a declaration barrel beside the runtime barrel", async () => {
+    const dirB = await mkdtemp(path.join(tmpdir(), "barrel-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(db),
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dirB }],
+        source: manualSource(),
+        log: () => {},
+      });
+      await watcher.runOnce();
+      const entries = await readdir(dirB);
+      expect(entries).toContain("index.mjs");
+      // Without this, a strict-TS consumer cannot type barrel imports;
+      // found by dogfooding against the published package.
+      expect(entries).toContain("index.d.mts");
+      const decl = await readFile(path.join(dirB, "index.d.mts"), "utf8");
+      expect(decl).toContain('export * from "./things.mjs";');
+    } finally {
+      await rm(dirB, { recursive: true, force: true });
+    }
+  });
+
   it("prunes files for dropped tables, types companion included", async () => {
     await db.exec("create table doomed (id serial primary key)");
     const watcher = new Watcher({
