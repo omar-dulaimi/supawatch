@@ -7,6 +7,7 @@ import type {
   TargetCapabilities,
   TargetOptions,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // Emits graphql-schema.mjs: a Pothos builder wiring one object type per
 // table with per-table list and byId queries over postgres.js. Field
@@ -33,9 +34,8 @@ function pothosField(runtime: RuntimeType): { method: string; wrap: (r: string) 
   }
 }
 
-function baseNameFor(table: Table): string {
-  const clean = table.name.replace(/[^a-zA-Z0-9_]/g, "_");
-  return clean.charAt(0).toUpperCase() + clean.slice(1);
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
 function quotedIdent(table: Table): string {
@@ -67,7 +67,7 @@ export class GraphqlTarget implements Target<GraphqlTargetOptions> {
       "  const builder = new SchemaBuilder({});",
     ];
     for (const table of tables) {
-      const base = baseNameFor(table);
+      const base = baseNameFor(table, snapshot);
       lines.push(
         `  const ${base}Ref = builder.objectRef(${JSON.stringify(base)});`,
         `  ${base}Ref.implement({`,
@@ -84,9 +84,9 @@ export class GraphqlTarget implements Target<GraphqlTargetOptions> {
     }
     lines.push("  builder.queryType({", "    fields: (t) => ({");
     for (const table of tables) {
-      const base = baseNameFor(table);
+      const base = baseNameFor(table, snapshot);
       const ident = quotedIdent(table);
-      const field = table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+      const field = exportBaseName(table, snapshot);
       lines.push(
         `      ${field}: t.field({`,
         `        type: [${base}Ref],`,

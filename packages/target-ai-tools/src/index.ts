@@ -6,6 +6,7 @@ import type {
   TargetCapabilities,
   TargetOptions,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // Emits ai-tools.mjs: Vercel AI SDK tool() definitions per table, list
 // and get, input schemas reused from the generated Zod target. Same
@@ -16,8 +17,8 @@ export interface AiToolsTargetOptions extends TargetOptions {
   schemasImportPath?: string;
 }
 
-function baseNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
 function quotedIdent(table: Table): string {
@@ -50,12 +51,12 @@ export class AiToolsTarget implements Target<AiToolsTargetOptions> {
     ];
     for (const table of tables) {
       lines.push(
-        `import { ${baseNameFor(table)}Row } from ${JSON.stringify(`${importPath}/${table.name}.mjs`)};`,
+        `import { ${baseNameFor(table, snapshot)}Row } from ${JSON.stringify(`${importPath}/${fileBaseName(table, snapshot)}.mjs`)};`,
       );
     }
     lines.push("", "export function createAiTools({ sql }) {", "  return {");
     for (const table of tables) {
-      const base = baseNameFor(table);
+      const base = baseNameFor(table, snapshot);
       const ident = quotedIdent(table);
       lines.push(
         `    ${base}_list: tool({`,

@@ -12,6 +12,7 @@ import type {
   Verdict,
   Verifier,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 export interface ArktypeTargetOptions extends TargetOptions {
   strict?: boolean;
@@ -85,12 +86,12 @@ function tsType(runtime: RuntimeType): string {
   }
 }
 
-export function exportNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Row";
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot) + "Row";
 }
 
-function baseNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
 function jsonOverrideFor(
@@ -155,7 +156,7 @@ export class ArktypeTarget implements Target<ArktypeTargetOptions> {
 
   renderTable(
     table: Table,
-    _snapshot: Snapshot,
+    snapshot: Snapshot,
     opts: ArktypeTargetOptions,
   ): Rendered {
     const strict = opts.strict !== false;
@@ -164,24 +165,24 @@ export class ArktypeTarget implements Target<ArktypeTargetOptions> {
       .join("\n");
     const rejectLine = strict ? `  "+": "reject",\n` : "";
     const parts = [
-      `export const ${exportNameFor(table)} = type({\n${rejectLine}${fields}\n});`,
+      `export const ${exportNameFor(table, snapshot)} = type({\n${rejectLine}${fields}\n});`,
     ];
     if (opts.emit?.insert && table.kind === "table") {
-      parts.push(variantBody(table, strict, `${baseNameFor(table)}Insert`, insertOptional));
+      parts.push(variantBody(table, strict, `${baseNameFor(table, snapshot)}Insert`, insertOptional));
     }
     if (opts.emit?.update && table.kind === "table") {
-      parts.push(variantBody(table, strict, `${baseNameFor(table)}Update`, () => true));
+      parts.push(variantBody(table, strict, `${baseNameFor(table, snapshot)}Update`, () => true));
     }
     return {
       imports: [{ from: "arktype", names: ["type"] }],
       body: parts.join("\n\n"),
-      exportName: exportNameFor(table),
+      exportName: exportNameFor(table, snapshot),
     };
   }
 
-  renderTypes(table: Table, _snapshot: Snapshot, opts: ArktypeTargetOptions): string {
-    const name = exportNameFor(table);
-    const base = baseNameFor(table);
+  renderTypes(table: Table, snapshot: Snapshot, opts: ArktypeTargetOptions): string {
+    const name = exportNameFor(table, snapshot);
+    const base = baseNameFor(table, snapshot);
     const rowType = `${base}RowType`;
     const typeOf = (col: Column) => {
       const override = jsonOverrideFor(table, col, opts.jsonTypes);

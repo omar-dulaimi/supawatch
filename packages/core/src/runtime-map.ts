@@ -94,11 +94,14 @@ export function runtimeFor(
 export function arrayRuntimeFor(
   elementRuntime: RuntimeType,
   declaredDims: number,
-  profile: DriverProfile = "postgres-js",
+  _profile: DriverProfile = "postgres-js",
 ): RuntimeType {
-  if (elementRuntime.kind === "enum" && profile === "postgres-js") {
-    return { kind: "string", format: "array-literal" };
-  }
+  // Enum arrays are REAL arrays under both profiles. Measured: a fresh
+  // postgres.js connection fetches custom type parsers at connect and
+  // returns ["a","b"]; only a connection opened before the enum type
+  // existed returns the raw "{a,b}" literal (documented honest limit).
+  // PGlite always returns the raw literal; the verify harness normalizes
+  // that under a named DRIVER_DELTAS entry.
   if (declaredDims > 1) {
     return { kind: "array", element: { kind: "unknown" } };
   }

@@ -37,6 +37,10 @@ function querierFromPglite(db: PGlite): Querier {
 
 let db: PGlite;
 let snapshot: Snapshot;
+// Multi-schema snapshot only for the pgmq target: with several schemas
+// export and file names get schema prefixes, and the API-target tests
+// deliberately stay in single-schema mode.
+let snapshotWithPgmq: Snapshot;
 let dir: string;
 let zodDir: string;
 
@@ -61,7 +65,8 @@ beforeAll(async () => {
       message jsonb
     );
   `);
-  snapshot = await introspect(querierFromPglite(db), ["public", "pgmq"]);
+  snapshot = await introspect(querierFromPglite(db), ["public"]);
+  snapshotWithPgmq = await introspect(querierFromPglite(db), ["public", "pgmq"]);
 
   dir = await mkdtemp(path.join(HERE, "final-"));
   zodDir = path.join(dir, "zod");
@@ -90,7 +95,7 @@ describe("policy facet", () => {
 
     const { diff } = await import("@supawatch/core");
     await db.exec("drop policy parcels_read on parcels");
-    const next = await introspect(querierFromPglite(db), ["public", "pgmq"]);
+    const next = await introspect(querierFromPglite(db), ["public"]);
     expect(diff(snapshot, next)).toContain("policy parcels_read dropped on public.parcels");
     await db.exec("create policy parcels_read on parcels for select using (true)");
   });
@@ -280,7 +285,7 @@ describe("rls target", () => {
 
 describe("pgmq target", () => {
   it("detects queues from the pgmq schema and emits typed clients", () => {
-    const [file] = new PgmqTarget().renderSnapshot(snapshot, {});
+    const [file] = new PgmqTarget().renderSnapshot(snapshotWithPgmq, {});
     expect(file.file).toBe("pgmq-clients.mjs");
     expect(file.content).toContain("export function jobsQueue(sql)");
     expect(file.content).toContain("select pgmq.send('jobs', $1::jsonb, $2::integer)");

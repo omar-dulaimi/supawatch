@@ -54,14 +54,6 @@ function bridgeRuntime(col: Column, snapshot: Snapshot): RuntimeType {
       "supabase-js",
     );
   }
-  if (col.runtime.kind === "string" && col.runtime.format === "array-literal") {
-    // postgres-js collapses enum arrays to a raw literal; PostgREST
-    // parses them. Recover the element labels via the enum reference.
-    const e = snapshot.enums.find((x) => x.name === col.enumRef);
-    if (e) {
-      return { kind: "array", element: { kind: "enum", labels: e.labels } };
-    }
-  }
   return runtimeFor(col.pgTypeName, kindOf(col, snapshot), { enums: snapshot.enums }, "supabase-js");
 }
 
@@ -73,6 +65,12 @@ function kindOf(col: Column, snapshot: Snapshot): string {
 
 function runtimeFromName(element: RuntimeType, _snapshot: Snapshot): RuntimeType {
   return element;
+}
+
+// Database identifiers are free-form ("Order Log", "café", "select");
+// quote any key that is not a plain TS identifier.
+function tsKey(name: string): string {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(name) ? name : JSON.stringify(name);
 }
 
 function writableColumns(table: Table): Column[] {
@@ -92,7 +90,7 @@ function fieldLine(
   const runtime = bridgeRuntime(col, snapshot);
   let t = tsType(runtime, "Json");
   if (col.nullable && t !== "unknown") t = `${t} | null`;
-  return `${indent}${col.name}${optional ? "?" : ""}: ${t}`;
+  return `${indent}${tsKey(col.name)}${optional ? "?" : ""}: ${t}`;
 }
 
 export class SupabaseTypesTarget implements Target<SupabaseTypesOptions> {
@@ -133,11 +131,11 @@ export class SupabaseTypesTarget implements Target<SupabaseTypesOptions> {
       const enums = snapshot.enums.filter((e) => e.schema === schema);
       const composites = snapshot.composites.filter((c) => c.schema === schema);
 
-      lines.push(`  ${schema}: {`);
+      lines.push(`  ${tsKey(schema)}: {`);
 
       lines.push("    Tables: {");
       for (const table of tables) {
-        lines.push(`      ${table.name}: {`);
+        lines.push(`      ${tsKey(table.name)}: {`);
         lines.push("        Row: {");
         for (const col of table.columns) {
           lines.push(fieldLine(col, snapshot, false, "          ") + ";");
@@ -178,7 +176,7 @@ export class SupabaseTypesTarget implements Target<SupabaseTypesOptions> {
 
       lines.push("    Views: {");
       for (const view of views) {
-        lines.push(`      ${view.name}: {`);
+        lines.push(`      ${tsKey(view.name)}: {`);
         lines.push("        Row: {");
         for (const col of view.columns) {
           lines.push(fieldLine(col, snapshot, false, "          ") + ";");
@@ -193,26 +191,40 @@ export class SupabaseTypesTarget implements Target<SupabaseTypesOptions> {
         lines.push("    Functions: Record<string, never>;");
       } else {
         lines.push("    Functions: {");
+        // Overloaded names share one key: Args and Returns become unions
+        // of the signatures, never duplicate keys (invalid TS).
+        const byName = new Map<string, typeof fns>();
         for (const fn of fns) {
-          lines.push(`      ${fn.name}: {`);
-          if (fn.args.length === 0) {
-            lines.push("        Args: Record<string, never>;");
-          } else {
-            lines.push("        Args: {");
-            for (const arg of fn.args) {
+          const group = byName.get(fn.name) ?? [];
+          group.push(fn);
+          byName.set(fn.name, group);
+        }
+        for (const [name, group] of byName) {
+          const argShapes = group.map((fn) => {
+            if (fn.args.length === 0) return "Record<string, never>";
+            const fields = fn.args.map((arg) => {
               const t = tsType(
                 runtimeFor(arg.pgTypeName, "b", { enums: snapshot.enums }, "supabase-js"),
                 "Json",
               );
-              lines.push(`          ${arg.name}${arg.hasDefault ? "?" : ""}: ${t};`);
-            }
-            lines.push("        };");
-          }
-          const ret = tsType(
-            runtimeFor(fn.returns.pgTypeName, "b", { enums: snapshot.enums }, "supabase-js"),
-            "Json",
-          );
-          lines.push(`        Returns: ${fn.returns.isSet ? `(${ret})[]` : ret};`);
+              return `${tsKey(arg.name)}${arg.hasDefault ? "?" : ""}: ${t}`;
+            });
+            return `{ ${fields.join("; ")} }`;
+          });
+          const returnShapes = [
+            ...new Set(
+              group.map((fn) => {
+                const ret = tsType(
+                  runtimeFor(fn.returns.pgTypeName, "b", { enums: snapshot.enums }, "supabase-js"),
+                  "Json",
+                );
+                return fn.returns.isSet ? `(${ret})[]` : ret;
+              }),
+            ),
+          ];
+          lines.push(`      ${tsKey(name)}: {`);
+          lines.push(`        Args: ${[...new Set(argShapes)].join(" | ")};`);
+          lines.push(`        Returns: ${returnShapes.join(" | ")};`);
           lines.push("      };");
         }
         lines.push("    };");
@@ -221,17 +233,17 @@ export class SupabaseTypesTarget implements Target<SupabaseTypesOptions> {
       lines.push("    Enums: {");
       for (const e of enums) {
         lines.push(
-          `      ${e.name}: ${e.labels.map((l) => JSON.stringify(l)).join(" | ")};`,
+          `      ${tsKey(e.name)}: ${e.labels.map((l) => JSON.stringify(l)).join(" | ")};`,
         );
       }
       lines.push("    };");
 
       lines.push("    CompositeTypes: {");
       for (const c of composites) {
-        lines.push(`      ${c.name}: {`);
+        lines.push(`      ${tsKey(c.name)}: {`);
         for (const f of c.fields) {
           const t = tsType(f.runtime, "Json");
-          lines.push(`        ${f.name}: ${t} | null;`);
+          lines.push(`        ${tsKey(f.name)}: ${t} | null;`);
         }
         lines.push("      };");
       }

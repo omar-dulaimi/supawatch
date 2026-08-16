@@ -6,7 +6,7 @@ export type RuntimeType =
   | { kind: "number"; integer: boolean }
   | {
       kind: "string";
-      format?: "uuid" | "numeric" | "bigint" | "composite" | "array-literal";
+      format?: "uuid" | "numeric" | "bigint" | "composite";
     }
   | { kind: "boolean" }
   | { kind: "date" }

@@ -6,6 +6,7 @@ import type {
   TargetCapabilities,
   TargetOptions,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // Emits mcp-server.mjs: a factory building an MCP server with list and
 // get tools per table, input-validated by the already-generated Zod
@@ -18,8 +19,8 @@ export interface McpTargetOptions extends TargetOptions {
   schemasImportPath?: string;
 }
 
-function baseNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
 function quotedIdent(table: Table): string {
@@ -52,7 +53,7 @@ export class McpTarget implements Target<McpTargetOptions> {
     ];
     for (const table of tables) {
       lines.push(
-        `import { ${baseNameFor(table)}Row } from ${JSON.stringify(`${importPath}/${table.name}.mjs`)};`,
+        `import { ${baseNameFor(table, snapshot)}Row } from ${JSON.stringify(`${importPath}/${fileBaseName(table, snapshot)}.mjs`)};`,
       );
     }
     lines.push(
@@ -61,7 +62,7 @@ export class McpTarget implements Target<McpTargetOptions> {
       "  const server = new McpServer({ name, version });",
     );
     for (const table of tables) {
-      const base = baseNameFor(table);
+      const base = baseNameFor(table, snapshot);
       const ident = quotedIdent(table);
       lines.push(
         `  server.tool(`,

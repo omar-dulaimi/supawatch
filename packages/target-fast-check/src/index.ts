@@ -8,6 +8,7 @@ import type {
   TargetCapabilities,
   TargetOptions,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // Emits one fast-check Arbitrary per table producing rows shaped exactly
 // like driver output, so property tests fuzz the same values the schemas
@@ -77,8 +78,8 @@ function tsType(runtime: RuntimeType): string {
   }
 }
 
-export function exportNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Arb";
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot) + "Arb";
 }
 
 function fieldArb(col: Column): string {
@@ -95,20 +96,20 @@ export class FastCheckTarget implements Target<FastCheckTargetOptions> {
     dateInstances: true,
   };
 
-  renderTable(table: Table, _snapshot: Snapshot, _opts: FastCheckTargetOptions): Rendered {
+  renderTable(table: Table, snapshot: Snapshot, _opts: FastCheckTargetOptions): Rendered {
     const fields = table.columns
       .map((col) => `  ${JSON.stringify(col.name)}: ${fieldArb(col)},`)
       .join("\n");
     return {
       imports: [{ from: "fast-check", namespace: "fc" }],
-      body: `export const ${exportNameFor(table)} = fc.record({\n${fields}\n});`,
-      exportName: exportNameFor(table),
+      body: `export const ${exportNameFor(table, snapshot)} = fc.record({\n${fields}\n});`,
+      exportName: exportNameFor(table, snapshot),
     };
   }
 
-  renderTypes(table: Table, _snapshot: Snapshot, _opts: FastCheckTargetOptions): string {
-    const name = exportNameFor(table);
-    const rowType = table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "ArbRow";
+  renderTypes(table: Table, snapshot: Snapshot, _opts: FastCheckTargetOptions): string {
+    const name = exportNameFor(table, snapshot);
+    const rowType = exportBaseName(table, snapshot) + "ArbRow";
     const fields = table.columns
       .map((col) => {
         const base = tsType(col.runtime);

@@ -12,6 +12,7 @@ import type {
   Verdict,
   Verifier,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // Emits one JSON Schema (draft-07, the maximum-interop dialect) per
 // table, describing the row as
@@ -55,8 +56,8 @@ function fieldSchema(col: Column): Record<string, unknown> {
   return { anyOf: [base, { type: "null" }] };
 }
 
-export function exportNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Row";
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot) + "Row";
 }
 
 export class JsonSchemaTarget implements Target<JsonSchemaTargetOptions> {
@@ -69,7 +70,7 @@ export class JsonSchemaTarget implements Target<JsonSchemaTargetOptions> {
     dateInstances: false,
   };
 
-  renderTable(table: Table, _snapshot: Snapshot, opts: JsonSchemaTargetOptions): Rendered {
+  renderTable(table: Table, snapshot: Snapshot, opts: JsonSchemaTargetOptions): Rendered {
     const strict = opts.strict !== false;
     const properties: Record<string, unknown> = {};
     for (const col of table.columns) {
@@ -87,7 +88,7 @@ export class JsonSchemaTarget implements Target<JsonSchemaTargetOptions> {
     return {
       imports: [],
       body: JSON.stringify(schema, null, 2) + "\n",
-      exportName: exportNameFor(table),
+      exportName: exportNameFor(table, snapshot),
     };
   }
 

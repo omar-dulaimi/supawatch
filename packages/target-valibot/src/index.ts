@@ -12,6 +12,7 @@ import type {
   Verdict,
   Verifier,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 export interface ValibotTargetOptions extends TargetOptions {
   strict?: boolean;
@@ -69,12 +70,12 @@ function tsType(runtime: RuntimeType): string {
   }
 }
 
-export function exportNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Row";
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot) + "Row";
 }
 
-function baseNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
 function fieldSchema(col: Column): string {
@@ -129,7 +130,7 @@ export class ValibotTarget implements Target<ValibotTargetOptions> {
 
   renderTable(
     table: Table,
-    _snapshot: Snapshot,
+    snapshot: Snapshot,
     opts: ValibotTargetOptions,
   ): Rendered {
     const strict = opts.strict !== false;
@@ -138,24 +139,24 @@ export class ValibotTarget implements Target<ValibotTargetOptions> {
       .map((col) => `  ${JSON.stringify(col.name)}: ${fieldSchema(col)},`)
       .join("\n");
     const parts = [
-      `export const ${exportNameFor(table)} = ${ctor}({\n${fields}\n});`,
+      `export const ${exportNameFor(table, snapshot)} = ${ctor}({\n${fields}\n});`,
     ];
     if (opts.emit?.insert && table.kind === "table") {
-      parts.push(variantBody(table, ctor, `${baseNameFor(table)}Insert`, insertOptional));
+      parts.push(variantBody(table, ctor, `${baseNameFor(table, snapshot)}Insert`, insertOptional));
     }
     if (opts.emit?.update && table.kind === "table") {
-      parts.push(variantBody(table, ctor, `${baseNameFor(table)}Update`, () => true));
+      parts.push(variantBody(table, ctor, `${baseNameFor(table, snapshot)}Update`, () => true));
     }
     return {
       imports: [{ from: "valibot", namespace: "v" }],
       body: parts.join("\n\n"),
-      exportName: exportNameFor(table),
+      exportName: exportNameFor(table, snapshot),
     };
   }
 
-  renderTypes(table: Table, _snapshot: Snapshot, opts: ValibotTargetOptions): string {
-    const name = exportNameFor(table);
-    const base = baseNameFor(table);
+  renderTypes(table: Table, snapshot: Snapshot, opts: ValibotTargetOptions): string {
+    const name = exportNameFor(table, snapshot);
+    const base = baseNameFor(table, snapshot);
     const rowType = `${base}RowType`;
     const typeOf = (col: Column) => {
       const override = jsonOverrideFor(table, col, opts.jsonTypes);

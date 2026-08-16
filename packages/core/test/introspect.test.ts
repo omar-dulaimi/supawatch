@@ -94,7 +94,7 @@ describe("introspect against a real Postgres (PGlite)", () => {
     expect(byName.ref.runtime).toEqual({ kind: "string", format: "uuid" });
   });
 
-  it("maps arrays from measured evidence: typed elements, raw-literal enum arrays, unknown multidim", async () => {
+  it("maps arrays from measured evidence: typed elements, enum arrays, unknown multidim", async () => {
     await db.exec(`
       create domain label_text as text;
       create table arr_probe (
@@ -122,8 +122,14 @@ describe("introspect against a real Postgres (PGlite)", () => {
       kind: "array",
       element: { kind: "string", format: "numeric" },
     });
-    // Both drivers hand enum arrays back as the raw literal "{a,b}".
-    expect(by.states.runtime).toEqual({ kind: "string", format: "array-literal" });
+    // Measured: a fresh postgres.js connection parses enum arrays to real
+    // arrays (custom type parsers are fetched at connect). PGlite still
+    // returns the raw literal; the harness normalizes that under the
+    // enum-array-literal-vs-array delta.
+    expect(by.states.runtime).toEqual({
+      kind: "array",
+      element: { kind: "enum", labels: ["pending", "paid", "shipped"] },
+    });
     // Domain elements resolve to their base before the array wraps them.
     expect(by.labels.runtime).toEqual({ kind: "array", element: { kind: "string" } });
     // Postgres does not enforce declared dimensionality; multidim maps honestly.

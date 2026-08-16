@@ -11,6 +11,7 @@ import type {
   Verdict,
   Verifier,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 export interface ZodTargetOptions extends TargetOptions {
   strict?: boolean;
@@ -65,12 +66,12 @@ function tsType(runtime: RuntimeType): string {
   }
 }
 
-export function exportNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Row";
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot) + "Row";
 }
 
-function baseNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
 function fieldSchema(col: Column): string {
@@ -134,33 +135,33 @@ export class ZodTarget implements Target<ZodTargetOptions> {
     dateInstances: true,
   };
 
-  renderTable(table: Table, _snapshot: Snapshot, opts: ZodTargetOptions): Rendered {
+  renderTable(table: Table, snapshot: Snapshot, opts: ZodTargetOptions): Rendered {
     const strict = opts.strict !== false;
     const ctor = strict ? "z.strictObject" : "z.object";
     const fields = table.columns
       .map((col) => `  ${JSON.stringify(col.name)}: ${fieldSchema(col)},`)
       .join("\n");
     const parts = [
-      `export const ${exportNameFor(table)} = ${ctor}({\n${fields}\n});`,
+      `export const ${exportNameFor(table, snapshot)} = ${ctor}({\n${fields}\n});`,
     ];
     if (opts.emit?.insert && table.kind === "table") {
-      parts.push(variantBody(table, ctor, `${baseNameFor(table)}Insert`, insertOptional));
+      parts.push(variantBody(table, ctor, `${baseNameFor(table, snapshot)}Insert`, insertOptional));
     }
     if (opts.emit?.update && table.kind === "table") {
-      parts.push(variantBody(table, ctor, `${baseNameFor(table)}Update`, () => true));
+      parts.push(variantBody(table, ctor, `${baseNameFor(table, snapshot)}Update`, () => true));
     }
     return {
       imports: [{ from: "zod", names: ["z"] }],
       body: parts.join("\n\n"),
-      exportName: exportNameFor(table),
+      exportName: exportNameFor(table, snapshot),
     };
   }
 
   // Companion .d.mts so consumers get a typed parse and a Row type even
   // though the runtime artifact is plain JavaScript.
-  renderTypes(table: Table, _snapshot: Snapshot, opts: ZodTargetOptions): string {
-    const name = exportNameFor(table);
-    const base = baseNameFor(table);
+  renderTypes(table: Table, snapshot: Snapshot, opts: ZodTargetOptions): string {
+    const name = exportNameFor(table, snapshot);
+    const base = baseNameFor(table, snapshot);
     const rowType = `${base}RowType`;
     const fields = table.columns
       .map((col) => {
