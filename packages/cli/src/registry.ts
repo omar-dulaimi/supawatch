@@ -76,6 +76,28 @@ export const TARGETS: readonly TargetEntry[] = [
     outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "fast-check"),
   },
   {
+    kind: "forms",
+    specifier: "@supawatch/target-forms",
+    load: () => import("@supawatch/target-forms"),
+    construct: (m) => new (m as { FormsTarget: new () => Target }).FormsTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "forms"),
+  },
+  {
+    kind: "factories",
+    specifier: "@supawatch/target-factories",
+    load: () => import("@supawatch/target-factories"),
+    construct: (m) =>
+      new (m as { FactoriesTarget: new () => Target }).FactoriesTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "factories"),
+  },
+  {
+    kind: "trpc",
+    specifier: "@supawatch/target-trpc",
+    load: () => import("@supawatch/target-trpc"),
+    construct: (m) => new (m as { TrpcTarget: new () => Target }).TrpcTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "trpc"),
+  },
+  {
     kind: "supabase-types",
     specifier: "@supawatch/target-supabase-types",
     load: () => import("@supawatch/target-supabase-types"),

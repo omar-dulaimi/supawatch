@@ -40,7 +40,7 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 V=$(cd "$ROOT/packages/core" && node -p "require('./package.json').version")
@@ -53,6 +53,7 @@ cat > out-work/package.json <<PKG
     "supawatch": "file:../tars/supawatch-${V}.tgz",
     "@sinclair/typebox": "^0.34.0",
     "fast-check": "^4.0.0",
+    "@trpc/server": "^11.0.0",
     "arktype": "^2.1.0",
     "valibot": "^1.1.0",
     "zod": "^4.0.0"
@@ -64,6 +65,9 @@ cat > out-work/package.json <<PKG
     "@supawatch/target-schema-lock": "file:../tars/supawatch-target-schema-lock-${V}.tgz",
     "@supawatch/target-json-schema": "file:../tars/supawatch-target-json-schema-${V}.tgz",
     "@supawatch/target-fast-check": "file:../tars/supawatch-target-fast-check-${V}.tgz",
+    "@supawatch/target-forms": "file:../tars/supawatch-target-forms-${V}.tgz",
+    "@supawatch/target-factories": "file:../tars/supawatch-target-factories-${V}.tgz",
+    "@supawatch/target-trpc": "file:../tars/supawatch-target-trpc-${V}.tgz",
     "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V}.tgz",
     "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V}.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V}.tgz",
@@ -100,6 +104,9 @@ export default defineConfig({
     { kind: "schema-lock" },
     { kind: "json-schema", strict: true },
     { kind: "fast-check" },
+    { kind: "forms" },
+    { kind: "factories" },
+    { kind: "trpc" },
   ],
 });
 CFG
@@ -184,6 +191,35 @@ Promise.all([import('$OUT/fast-check/orders.mjs'), import('$OUT/zod/orders.mjs')
   }
   console.log('fast-check arbs satisfy zod live: 5/5');
 })") || fail "fast-check arbs do not satisfy zod"
+
+echo "== 9c. batch-2 target assertions =="
+[ -f "$OUT/forms/orders.mjs" ] || fail "forms config missing"
+node -e "import('$OUT/forms/orders.mjs').then((m) => { const f = m.ordersFields.find((x) => x.name === 'status'); if (!f || f.control !== 'select' || !f.options.includes('refunded')) process.exit(1); })" || fail "forms enum select malformed"
+[ -f "$OUT/factories/orders.mjs" ] || fail "factory missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/factories/orders.mjs'), import('$OUT/zod/orders.mjs')]).then(([f, z]) => {
+  const row = f.makeOrders({ refund_reason: 'damaged' });
+  const v = z.ordersRow.safeParse(row);
+  if (!v.success) { console.error('factory row rejected:', v.error.issues[0]); process.exit(1); }
+  if (row.refund_reason !== 'damaged') process.exit(1);
+  console.log('factory row satisfies zod live');
+})") || fail "factory row does not satisfy zod"
+[ -f "$OUT/trpc/orders.mjs" ] || fail "trpc router missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/trpc/orders.mjs'), import('@trpc/server'), import('postgres')]).then(async ([m, trpc, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const t = trpc.initTRPC.create();
+  const router = m.createOrdersRouter(t, sql);
+  const caller = t.createCallerFactory(router)({});
+  const rows = await caller.list();
+  if (!rows.length || typeof rows[0].total !== 'string') { console.error('trpc list wrong'); process.exit(1); }
+  const one = await caller.byId({ id: rows[0].id });
+  if (!one || one.id !== rows[0].id) { console.error('trpc byId wrong'); process.exit(1); }
+  const created = await caller.create({ user_id: rows[0].user_id, status: 'paid', total: '5.00', tags: ['e2e'] });
+  if (created.total !== '5.00') { console.error('trpc create wrong'); process.exit(1); }
+  console.log('trpc live: list ' + rows.length + ', byId ok, create ok');
+  await sql.end();
+})") || fail "trpc router failed against live db"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

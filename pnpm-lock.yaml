@@ -32,9 +32,15 @@ importers:
       '@supawatch/target-erd':
         specifier: workspace:*
         version: link:../target-erd
+      '@supawatch/target-factories':
+        specifier: workspace:*
+        version: link:../target-factories
       '@supawatch/target-fast-check':
         specifier: workspace:*
         version: link:../target-fast-check
+      '@supawatch/target-forms':
+        specifier: workspace:*
+        version: link:../target-forms
       '@supawatch/target-json-schema':
         specifier: workspace:*
         version: link:../target-json-schema
@@ -44,6 +50,9 @@ importers:
       '@supawatch/target-supabase-types':
         specifier: workspace:*
         version: link:../target-supabase-types
+      '@supawatch/target-trpc':
+        specifier: workspace:*
+        version: link:../target-trpc
       '@supawatch/target-typebox':
         specifier: workspace:*
         version: link:../target-typebox
@@ -111,6 +120,19 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  packages/target-factories:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
   packages/target-fast-check:
     dependencies:
       '@supawatch/core':
@@ -123,6 +145,19 @@ importers:
       fast-check:
         specifier: ^3.15.0 || ^4.0.0
         version: 4.9.0
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
+  packages/target-forms:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
       typescript:
         specifier: ^5.9.0
         version: 5.9.3
@@ -157,6 +192,19 @@ importers:
         version: 5.9.3
 
   packages/target-supabase-types:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
+  packages/target-trpc:
     dependencies:
       '@supawatch/core':
         specifier: workspace:*
@@ -235,15 +283,24 @@ importers:
       '@supawatch/target-erd':
         specifier: workspace:*
         version: link:../target-erd
+      '@supawatch/target-factories':
+        specifier: workspace:*
+        version: link:../target-factories
       '@supawatch/target-fast-check':
         specifier: workspace:*
         version: link:../target-fast-check
+      '@supawatch/target-forms':
+        specifier: workspace:*
+        version: link:../target-forms
       '@supawatch/target-json-schema':
         specifier: workspace:*
         version: link:../target-json-schema
       '@supawatch/target-schema-lock':
         specifier: workspace:*
         version: link:../target-schema-lock
+      '@supawatch/target-trpc':
+        specifier: workspace:*
+        version: link:../target-trpc
       '@supawatch/target-typebox':
         specifier: workspace:*
         version: link:../target-typebox
@@ -253,6 +310,9 @@ importers:
       '@supawatch/target-zod':
         specifier: workspace:*
         version: link:../target-zod
+      '@trpc/server':
+        specifier: ^11.18.0
+        version: 11.18.0(typescript@5.9.3)
       '@types/node':
         specifier: ^22.20.1
         version: 22.20.1
@@ -697,6 +757,12 @@ packages:
 
   '@sinclair/typebox@0.34.52':
     resolution: {integrity: sha512-XiMQh7qqVlxZzcVD+kkGMNGMzcTrDMLWI7S4x7z1MkCkbDPrekpZXEUK0eZqZFMuHQg2a2DZOcDIh9o5v3Gonw==}
+
+  '@trpc/server@11.18.0':
+    resolution: {integrity: sha512-JAvXOuNTxgXjIDfQaOvDq1j66LMNfDJUH1IU7Slfn8EvRv2EkH6ehu3A7zpYhjO0syHHiYg77v2lG2JFJgvw7Q==}
+    hasBin: true
+    peerDependencies:
+      typescript: '>=5.7.2'
 
   '@types/chai@5.2.3':
     resolution: {integrity: sha512-Mw558oeA9fFbv65/y4mHtXDs9bPnFMZAL/jxdPFUpOHHIXX91mcgEHbS5Lahr+pwZFR8A7GQleRWeI6cGFC2UA==}
@@ -1640,6 +1706,10 @@ snapshots:
     optional: true
 
   '@sinclair/typebox@0.34.52': {}
+
+  '@trpc/server@11.18.0(typescript@5.9.3)':
+    dependencies:
+      typescript: 5.9.3
 
   '@types/chai@5.2.3':
     dependencies:
