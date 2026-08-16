@@ -1,5 +1,12 @@
 # @supawatch/core
 
+## 0.1.3
+
+### Patch Changes
+
+- e650db3: Proper npm pages: every package now ships a focused README, a
+  description, and keywords. No code changes.
+
 ## 0.1.2
 
 ### Patch Changes
