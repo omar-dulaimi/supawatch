@@ -40,12 +40,12 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc target-schema-card target-dictionary target-realtime target-mcp target-ai-tools watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc target-schema-card target-dictionary target-realtime target-mcp target-ai-tools target-seed watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 pv() { node -p "require('$ROOT/packages/$1/package.json').version"; }
 V_CARD=$(pv target-schema-card); V_DICT=$(pv target-dictionary); V_RT=$(pv target-realtime)
-V_MCP=$(pv target-mcp); V_AI=$(pv target-ai-tools)
+V_MCP=$(pv target-mcp); V_AI=$(pv target-ai-tools); V_SEED=$(pv target-seed)
 V=$(pv core)
 V_ERD=$(pv target-erd); V_LOCK=$(pv target-schema-lock); V_JS=$(pv target-json-schema)
 V_FC=$(pv target-fast-check); V_FORMS=$(pv target-forms); V_FACT=$(pv target-factories)
@@ -85,6 +85,7 @@ cat > out-work/package.json <<PKG
     "@supawatch/target-realtime": "file:../tars/supawatch-target-realtime-${V_RT}.tgz",
     "@supawatch/target-mcp": "file:../tars/supawatch-target-mcp-${V_MCP}.tgz",
     "@supawatch/target-ai-tools": "file:../tars/supawatch-target-ai-tools-${V_AI}.tgz",
+    "@supawatch/target-seed": "file:../tars/supawatch-target-seed-${V_SEED}.tgz",
     "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V_ST}.tgz",
     "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V_TB}.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V_VALI}.tgz",
@@ -129,6 +130,7 @@ export default defineConfig({
     { kind: "realtime" },
     { kind: "mcp" },
     { kind: "ai-tools" },
+    { kind: "seed", rows: 2 },
     { kind: "supabase-types", path: "$OUT" },
   ],
 });
@@ -298,6 +300,11 @@ Promise.all([import('$OUT/ai-tools.mjs'), import('postgres')]).then(async ([m, p
   console.log('ai-tools live: orders_list ' + rows.length + ' rows');
   await sql.end();
 })") || fail "ai tools execute failed"
+
+echo "== 9f. seed target assertions =="
+[ -f "$OUT/seed.sql" ] || fail "seed.sql missing"
+awk 'index($0, "insert into \"public\".\"users\"") { f = 1 } END { exit !f }' "$OUT/seed.sql" || fail "seed lacks users inserts"
+awk 'index($0, "setval") { f = 1 } END { exit !f }' "$OUT/seed.sql" || fail "seed lacks sequence resync"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

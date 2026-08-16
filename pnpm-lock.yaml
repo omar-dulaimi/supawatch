@@ -62,6 +62,9 @@ importers:
       '@supawatch/target-schema-lock':
         specifier: workspace:*
         version: link:../target-schema-lock
+      '@supawatch/target-seed':
+        specifier: workspace:*
+        version: link:../target-seed
       '@supawatch/target-supabase-types':
         specifier: workspace:*
         version: link:../target-supabase-types
@@ -277,6 +280,19 @@ importers:
         specifier: ^5.9.0
         version: 5.9.3
 
+  packages/target-seed:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
   packages/target-supabase-types:
     dependencies:
       '@supawatch/core':
@@ -402,6 +418,9 @@ importers:
       '@supawatch/target-schema-lock':
         specifier: workspace:*
         version: link:../target-schema-lock
+      '@supawatch/target-seed':
+        specifier: workspace:*
+        version: link:../target-seed
       '@supawatch/target-supabase-types':
         specifier: workspace:*
         version: link:../target-supabase-types

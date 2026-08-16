@@ -86,6 +86,10 @@ META = {
         "description": "Vercel AI SDK tool definitions generated from live Postgres by supawatch, validated by the generated Zod schemas.",
         "keywords": BASE_KEYWORDS + ["ai-sdk", "vercel-ai", "tools", "agents"],
     },
+    "target-seed": {
+        "description": "Deterministic FK-aware seed.sql generated from live Postgres by supawatch: topological order, identity overriding, sequence resync.",
+        "keywords": BASE_KEYWORDS + ["seed", "fixtures", "seed-sql", "supabase-seed"],
+    },
     "verify": {
         "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
         "keywords": BASE_KEYWORDS + ["pglite", "testing", "verification"],

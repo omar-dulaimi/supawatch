@@ -137,6 +137,13 @@ export const TARGETS: readonly TargetEntry[] = [
     outputDir: (t, cfg) => t.path ?? cfg.outDir,
   },
   {
+    kind: "seed",
+    specifier: "@supawatch/target-seed",
+    load: () => import("@supawatch/target-seed"),
+    construct: (m) => new (m as { SeedTarget: new () => Target }).SeedTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
     kind: "supabase-types",
     specifier: "@supawatch/target-supabase-types",
     load: () => import("@supawatch/target-supabase-types"),

@@ -54,6 +54,7 @@
     "@supawatch/target-realtime": "workspace:*",
     "@supawatch/target-schema-card": "workspace:*",
     "@supawatch/target-schema-lock": "workspace:*",
+    "@supawatch/target-seed": "workspace:*",
     "@supawatch/target-supabase-types": "workspace:*",
     "@supawatch/target-trpc": "workspace:*",
     "@supawatch/target-typebox": "workspace:*",
