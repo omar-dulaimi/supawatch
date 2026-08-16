@@ -1,5 +1,12 @@
 # @supawatch/target-json-schema
 
+## 0.6.0
+
+### Patch Changes
+
+- Updated dependencies [0fbe207]
+  - @supawatch/core@0.6.0
+
 ## 0.5.0
 
 ### Patch Changes
