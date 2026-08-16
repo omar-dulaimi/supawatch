@@ -53,12 +53,18 @@ function deterministicUuid(rand: () => number): string {
   return `${s(8)}-${s(4)}-4${s(3)}-${"89ab"[Math.floor(rand() * 4)]}${s(3)}-${s(12)}`;
 }
 
+// Types whose input syntax accepts arbitrary text. Every other
+// string-at-runtime type (inet, cidr, macaddr, interval, time, ...)
+// constrains its input, so a text placeholder would fail to apply.
+const FREE_TEXT_BASE_TYPES = new Set(["text", "varchar", "bpchar", "citext", "name"]);
+
 function literalFor(
   runtime: RuntimeType,
   col: Column,
   table: Table,
   rowIndex: number,
   rand: () => number,
+  baseTypeOf: (pgTypeName: string) => string,
 ): string | null {
   switch (runtime.kind) {
     case "number":
@@ -75,8 +81,14 @@ function literalFor(
           return sqlString(String(1 + Math.floor(rand() * 100000)));
         case "composite":
           return null; // cannot construct honestly from here
-        default:
-          return sqlString(`${table.name} ${col.name} ${rowIndex + 1}`);
+        default: {
+          const base = baseTypeOf(col.pgTypeName.replace(/^_/, ""));
+          if (!FREE_TEXT_BASE_TYPES.has(base)) return null;
+          const placeholder = `${table.name} ${col.name} ${rowIndex + 1}`;
+          // varchar(n)/char(n) declare a character cap in sqlType
+          const cap = /\((\d+)\)/.exec(col.sqlType)?.[1];
+          return sqlString(cap ? placeholder.slice(0, Number(cap)) : placeholder);
+        }
       }
     case "boolean":
       return rand() < 0.5 ? "true" : "false";
@@ -96,7 +108,7 @@ function literalFor(
       return sqlString(label) + `::"${col.pgTypeName.replace(/^_/, "")}"`;
     }
     case "array": {
-      const el = literalFor(runtime.element, col, table, rowIndex, rand);
+      const el = literalFor(runtime.element, col, table, rowIndex, rand, baseTypeOf);
       if (el === null) return null;
       return `array[${el}]`;
     }
@@ -107,39 +119,83 @@ function literalFor(
 
 // Kahn's algorithm over single-column FK edges; nullable-FK edges are
 // soft (broken first on cycles, seeded as null).
-function topoSort(tables: Table[]): { ordered: Table[]; cyclic: Table[] } {
+// Hard edges (required FKs) must be honored; soft edges (nullable FKs)
+// are honored too, because a nullable FK cell with a value still needs
+// its parent row first. Only when nothing can proceed does a soft edge
+// break, and the broken cells seed as null on every row.
+function topoSort(tables: Table[]): {
+  ordered: Table[];
+  cyclic: Table[];
+  brokenSoft: Set<string>;
+} {
   const byName = new Map(tables.map((t) => [`${t.schema}.${t.name}`, t]));
-  const deps = new Map<string, Set<string>>();
+  const hard = new Map<string, Set<string>>();
+  const soft = new Map<string, Map<string, string[]>>();
   for (const t of tables) {
     const key = `${t.schema}.${t.name}`;
-    const set = new Set<string>();
+    const h = new Set<string>();
+    const s = new Map<string, string[]>();
     for (const fk of t.foreignKeys) {
       const target = `${fk.referencedSchema}.${fk.referencedTable}`;
       const col = t.columns.find((c) => c.name === fk.columns[0]);
-      if (target !== key && byName.has(target) && col && !col.nullable) {
-        set.add(target);
+      if (target === key || !byName.has(target) || !col) continue;
+      if (col.nullable) {
+        s.set(target, [...(s.get(target) ?? []), col.name]);
+      } else {
+        h.add(target);
       }
     }
-    deps.set(key, set);
+    hard.set(key, h);
+    soft.set(key, s);
   }
+
   const ordered: Table[] = [];
   const done = new Set<string>();
-  let progress = true;
-  while (progress) {
-    progress = false;
+  const brokenSoft = new Set<string>();
+  for (;;) {
+    let progress = false;
     for (const t of tables) {
       const key = `${t.schema}.${t.name}`;
       if (done.has(key)) continue;
-      const remaining = [...(deps.get(key) ?? [])].filter((d) => !done.has(d));
-      if (remaining.length === 0) {
+      const hardLeft = [...(hard.get(key) ?? [])].some((d) => !done.has(d));
+      const softLeft = [...(soft.get(key)?.keys() ?? [])].some(
+        (d) => !done.has(d) && !brokenSoft.has(`${key}::${d}`),
+      );
+      if (!hardLeft && !softLeft) {
         ordered.push(t);
         done.add(key);
         progress = true;
       }
     }
+    if (progress) continue;
+    // stuck: break ONE soft edge on the first (deterministic) blocked
+    // table whose hard deps are satisfied, then retry
+    let broke = false;
+    for (const t of tables) {
+      const key = `${t.schema}.${t.name}`;
+      if (done.has(key)) continue;
+      if ([...(hard.get(key) ?? [])].some((d) => !done.has(d))) continue;
+      const pending = [...(soft.get(key)?.keys() ?? [])].find(
+        (d) => !done.has(d) && !brokenSoft.has(`${key}::${d}`),
+      );
+      if (pending !== undefined) {
+        brokenSoft.add(`${key}::${pending}`);
+        broke = true;
+        break;
+      }
+    }
+    if (!broke) break;
   }
   const cyclic = tables.filter((t) => !done.has(`${t.schema}.${t.name}`));
-  return { ordered, cyclic };
+  // Column-level view of the broken edges for the emitter.
+  const brokenCols = new Set<string>();
+  for (const marker of brokenSoft) {
+    const [key, target] = marker.split("::");
+    for (const colName of soft.get(key)?.get(target) ?? []) {
+      brokenCols.add(`${key}.${colName}`);
+    }
+  }
+  return { ordered, cyclic, brokenSoft: brokenCols };
 }
 
 export class SeedTarget implements Target<SeedTargetOptions> {
@@ -174,6 +230,8 @@ export class SeedTarget implements Target<SeedTargetOptions> {
     const constrainedDomains = new Set(
       snapshot.domains.filter((d) => d.hasConstraints).map((d) => d.name),
     );
+    const domainBase = new Map(snapshot.domains.map((d) => [d.name, d.baseTypeName]));
+    const baseTypeOf = (name: string): string => domainBase.get(name) ?? name;
 
     // The literal a table's Nth row uses for its single-column primary
     // key. Children reuse this for their FK cells, so uuid and numeric
@@ -191,10 +249,10 @@ export class SeedTarget implements Target<SeedTargetOptions> {
         return String(i + 1);
       }
       const rand = mulberry32(hashString(`${t.schema}.${t.name}.${pkName}.${i}`));
-      return literalFor(col.runtime, col, t, i, rand);
+      return literalFor(col.runtime, col, t, i, rand, baseTypeOf);
     };
 
-    const { ordered, cyclic } = topoSort(tables);
+    const { ordered, cyclic, brokenSoft } = topoSort(tables);
     for (const t of cyclic) {
       lines.push(
         `-- skipped ${t.schema}.${t.name}: required foreign keys form a cycle`,
@@ -236,10 +294,28 @@ export class SeedTarget implements Target<SeedTargetOptions> {
           continue;
         }
         if (fk) {
+          // FK cells reuse the parent's primary-key literals, which is
+          // only honest when the FK actually references that primary
+          // key. A reference to a UNIQUE column would get pk values in
+          // a non-pk column and violate on apply.
+          const parent = byName.get(`${fk.referencedSchema}.${fk.referencedTable}`);
+          const refsParentPk =
+            parent !== undefined &&
+            parent.primaryKey.length === 1 &&
+            fk.referencedColumns.length === 1 &&
+            fk.referencedColumns[0] === parent.primaryKey[0];
+          if (!refsParentPk) {
+            if (!col.nullable && !col.hasDefault) {
+              skipReasons.push(
+                `foreign key ${col.name} references ${fk.referencedTable}(${fk.referencedColumns.join(", ")}), not its primary key`,
+              );
+            }
+            continue;
+          }
           cols.push(col);
           continue;
         }
-        const probe = literalFor(col.runtime, col, table, 0, mulberry32(1));
+        const probe = literalFor(col.runtime, col, table, 0, mulberry32(1), baseTypeOf);
         if (probe === null) {
           if (!col.nullable && !col.hasDefault) {
             skipReasons.push(`no honest value for ${col.name} (${col.sqlType})`);
@@ -310,6 +386,9 @@ export class SeedTarget implements Target<SeedTargetOptions> {
           }
           const fk = table.foreignKeys.find((f) => f.columns.includes(col.name));
           if (fk) {
+            // a soft edge broken to escape a cycle seeds null on EVERY
+            // row: the parent rows do not exist yet at apply time
+            if (brokenSoft.has(`${table.schema}.${table.name}.${col.name}`)) return "null";
             if (col.nullable && i === rows - 1) return "null";
             const parent = byName.get(`${fk.referencedSchema}.${fk.referencedTable}`);
             const ref = parent ? pkLiteral(parent, i % rows) : null;
@@ -319,7 +398,7 @@ export class SeedTarget implements Target<SeedTargetOptions> {
           const rand = mulberry32(
             hashString(`${table.schema}.${table.name}.${col.name}.${i}`),
           );
-          return literalFor(col.runtime, col, table, i, rand) ?? "null";
+          return literalFor(col.runtime, col, table, i, rand, baseTypeOf) ?? "null";
         });
         lines.push(
           `insert into ${ident} (${colList})${overriding} values (${values.join(", ")});`,

@@ -77,7 +77,9 @@ export class DictionaryTarget implements Target<DictionaryTargetOptions> {
         if (col.identity) notes.push(`identity ${col.identity}`);
         if (col.generated) notes.push("generated");
         if (col.hasDefault) notes.push("has default");
-        if (col.comment) notes.push(col.comment);
+        // comments land inside a markdown table cell: pipes and
+        // newlines would break the row
+        if (col.comment) notes.push(col.comment.replace(/\|/g, "\\|").replace(/\s*\n\s*/g, " "));
         lines.push(
           `| ${col.name} | ${col.sqlType} | ${runtimeLabel(col.runtime)} | ${col.nullable ? "yes" : "no"} | ${notes.join("; ")} |`,
         );

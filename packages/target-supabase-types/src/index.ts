@@ -122,8 +122,9 @@ export class SupabaseTypesTarget implements Target<SupabaseTypesOptions> {
     ];
 
     for (const schema of schemas) {
+      // PostgREST exposes foreign tables beside plain ones.
       const tables = snapshot.tables.filter(
-        (t) => t.schema === schema && t.kind === "table",
+        (t) => t.schema === schema && t.kind !== "view",
       );
       const views = snapshot.tables.filter(
         (t) => t.schema === schema && t.kind === "view",

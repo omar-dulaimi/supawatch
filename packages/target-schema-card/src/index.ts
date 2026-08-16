@@ -79,7 +79,8 @@ export class SchemaCardTarget implements Target<SchemaCardTargetOptions> {
     ];
     for (const table of snapshot.tables) {
       const marker = table.kind === "view" ? " (view)" : "";
-      const comment = table.comment ? ` : ${table.comment}` : "";
+      // one bullet per table: a multiline comment must not break the line
+      const comment = table.comment ? ` : ${table.comment.replace(/\s*\n\s*/g, " ")}` : "";
       lines.push(`- ${table.name}${marker}${comment}`);
       lines.push(
         `  ${table.columns.map((c) => columnToken(table, c)).join("; ")}`,
