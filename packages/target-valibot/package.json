@@ -1,6 +1,17 @@
 {
   "name": "@supawatch/target-valibot",
   "version": "0.1.2",
+  "description": "Valibot schemas generated from live Postgres by supawatch, mapped to what the driver actually returns.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "valibot",
+    "validation"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {

@@ -1,6 +1,18 @@
 {
   "name": "@supawatch/watch",
   "version": "0.1.2",
+  "description": "The supawatch watcher runtime: event-trigger LISTEN, polling, debounced regeneration, row verification.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "listen",
+    "notify",
+    "watcher"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {

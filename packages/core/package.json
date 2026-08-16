@@ -1,6 +1,17 @@
 {
   "name": "@supawatch/core",
   "version": "0.1.2",
+  "description": "Snapshot IR, catalog introspection, diffing, and the measured runtime-type map behind supawatch.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "introspection",
+    "pg_catalog"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {

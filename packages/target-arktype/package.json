@@ -1,6 +1,17 @@
 {
   "name": "@supawatch/target-arktype",
   "version": "0.1.2",
+  "description": "ArkType types generated from live Postgres by supawatch, mapped to what the driver actually returns.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "arktype",
+    "validation"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {
