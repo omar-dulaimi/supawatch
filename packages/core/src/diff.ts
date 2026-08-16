@@ -118,6 +118,17 @@ function diffTable(prev: Table, next: Table): string[] {
       changes.push(`comment on ${name}.${colName} changed`);
     }
   }
+  if (prev.rlsEnabled !== next.rlsEnabled) {
+    changes.push(`rls ${next.rlsEnabled ? "enabled" : "disabled"} on ${name}`);
+  }
+  const prevPolicies = new Map(prev.policies.map((p) => [p.name, p]));
+  const nextPolicies = new Map(next.policies.map((p) => [p.name, p]));
+  for (const [pname] of nextPolicies) {
+    if (!prevPolicies.has(pname)) changes.push(`policy ${pname} created on ${name}`);
+  }
+  for (const [pname] of prevPolicies) {
+    if (!nextPolicies.has(pname)) changes.push(`policy ${pname} dropped on ${name}`);
+  }
   if ((prev.comment ?? "") !== (next.comment ?? "")) {
     changes.push(`comment on ${name} changed`);
   }

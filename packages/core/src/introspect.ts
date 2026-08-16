@@ -15,6 +15,7 @@ interface ColumnRow {
   table_schema: string;
   table_name: string;
   rel_kind: string;
+  rls_enabled: boolean;
   column_name: string;
   sql_type: string;
   pg_type_name: string;
@@ -178,6 +179,7 @@ export async function introspect(
        n.nspname as table_schema,
        c.relname as table_name,
        c.relkind::text as rel_kind,
+       c.relrowsecurity as rls_enabled,
        a.attname as column_name,
        format_type(a.atttypid, a.atttypmod) as sql_type,
        t.typname as pg_type_name,
@@ -269,6 +271,45 @@ export async function introspect(
     };
   });
 
+  const policyRows = await query<{
+    table_schema: string;
+    table_name: string;
+    policy_name: string;
+    command: string;
+    permissive: string;
+    roles: string[] | null;
+    using_expr: string | null;
+    check_expr: string | null;
+  }>(
+    `select
+       schemaname as table_schema,
+       tablename as table_name,
+       policyname as policy_name,
+       cmd as command,
+       permissive,
+       roles,
+       qual as using_expr,
+       with_check as check_expr
+     from pg_policies
+     where schemaname = any($1)
+     order by tablename, policyname`,
+    [schemas],
+  );
+  const policiesByTable = new Map<string, import("./types.js").RlsPolicy[]>();
+  for (const r of policyRows) {
+    const key = `${r.table_schema}.${r.table_name}`;
+    const list = policiesByTable.get(key) ?? [];
+    list.push({
+      name: r.policy_name,
+      command: r.command,
+      permissive: r.permissive === "PERMISSIVE",
+      roles: r.roles ?? [],
+      using: r.using_expr,
+      withCheck: r.check_expr,
+    });
+    policiesByTable.set(key, list);
+  }
+
   const pkRows = await query<{
     table_schema: string;
     table_name: string;
@@ -347,6 +388,8 @@ export async function introspect(
         schema: r.table_schema,
         name: r.table_name,
         kind: r.rel_kind === "v" ? "view" : "table",
+        rlsEnabled: r.rls_enabled === true,
+        policies: policiesByTable.get(key) ?? [],
         ...(r.table_comment ? { comment: r.table_comment } : {}),
         primaryKey: pkByTable.get(key) ?? [],
         foreignKeys: fksByTable.get(key) ?? [],

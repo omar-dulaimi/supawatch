@@ -1,0 +1,45 @@
+{
+  "name": "@supawatch/target-service",
+  "version": "0.5.0",
+  "description": "Typed repository layers generated from live Postgres by supawatch: list, findById, create, update, remove over postgres.js.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "repository",
+    "service-layer",
+    "crud"
+  ],
+  "license": "MIT",
+  "author": "Omar Dulaimi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omar-dulaimi/supawatch.git",
+    "directory": "packages/target-service"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supawatch/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.0"
+  }
+}

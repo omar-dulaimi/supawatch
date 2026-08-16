@@ -40,12 +40,15 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc target-schema-card target-dictionary target-realtime target-mcp target-ai-tools target-seed watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc target-schema-card target-dictionary target-realtime target-mcp target-ai-tools target-seed target-effect target-rest target-service target-orpc target-graphql target-pgtap target-rls target-pgmq watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 pv() { node -p "require('$ROOT/packages/$1/package.json').version"; }
 V_CARD=$(pv target-schema-card); V_DICT=$(pv target-dictionary); V_RT=$(pv target-realtime)
 V_MCP=$(pv target-mcp); V_AI=$(pv target-ai-tools); V_SEED=$(pv target-seed)
+V_EFF=$(pv target-effect); V_REST=$(pv target-rest); V_SVC=$(pv target-service)
+V_ORPC=$(pv target-orpc); V_GQL=$(pv target-graphql); V_TAP=$(pv target-pgtap)
+V_RLS=$(pv target-rls); V_PGMQ=$(pv target-pgmq)
 V=$(pv core)
 V_ERD=$(pv target-erd); V_LOCK=$(pv target-schema-lock); V_JS=$(pv target-json-schema)
 V_FC=$(pv target-fast-check); V_FORMS=$(pv target-forms); V_FACT=$(pv target-factories)
@@ -65,6 +68,11 @@ cat > out-work/package.json <<PKG
     "@supabase/supabase-js": "^2.45.0",
     "@modelcontextprotocol/sdk": "^1.0.0",
     "ai": "^5.0.0",
+    "effect": "^3.10.0",
+    "hono": "^4.6.0",
+    "@orpc/server": "^1.0.0",
+    "@pothos/core": "^4.0.0",
+    "graphql": "^16.9.0",
     "typescript": "^5.9.0",
     "arktype": "^2.1.0",
     "valibot": "^1.1.0",
@@ -86,6 +94,14 @@ cat > out-work/package.json <<PKG
     "@supawatch/target-mcp": "file:../tars/supawatch-target-mcp-${V_MCP}.tgz",
     "@supawatch/target-ai-tools": "file:../tars/supawatch-target-ai-tools-${V_AI}.tgz",
     "@supawatch/target-seed": "file:../tars/supawatch-target-seed-${V_SEED}.tgz",
+    "@supawatch/target-effect": "file:../tars/supawatch-target-effect-${V_EFF}.tgz",
+    "@supawatch/target-rest": "file:../tars/supawatch-target-rest-${V_REST}.tgz",
+    "@supawatch/target-service": "file:../tars/supawatch-target-service-${V_SVC}.tgz",
+    "@supawatch/target-orpc": "file:../tars/supawatch-target-orpc-${V_ORPC}.tgz",
+    "@supawatch/target-graphql": "file:../tars/supawatch-target-graphql-${V_GQL}.tgz",
+    "@supawatch/target-pgtap": "file:../tars/supawatch-target-pgtap-${V_TAP}.tgz",
+    "@supawatch/target-rls": "file:../tars/supawatch-target-rls-${V_RLS}.tgz",
+    "@supawatch/target-pgmq": "file:../tars/supawatch-target-pgmq-${V_PGMQ}.tgz",
     "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V_ST}.tgz",
     "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V_TB}.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V_VALI}.tgz",
@@ -131,6 +147,14 @@ export default defineConfig({
     { kind: "mcp" },
     { kind: "ai-tools" },
     { kind: "seed", rows: 2 },
+    { kind: "effect" },
+    { kind: "rest" },
+    { kind: "service" },
+    { kind: "orpc" },
+    { kind: "graphql" },
+    { kind: "pgtap" },
+    { kind: "rls" },
+    { kind: "pgmq" },
     { kind: "supabase-types", path: "$OUT" },
   ],
 });
@@ -166,6 +190,13 @@ sleep 1
 echo "== 7b. Live DDL: a view appears =="
 $PSQL -c 'create view refunded_orders as select o.id, r.amount from orders o join refunds r on r.order_id = o.id;' >/dev/null
 wait_for_log "view public.refunded_orders created" 15
+sleep 1
+
+echo "== 7c. Live DDL: rls enabled and a policy created =="
+$PSQL -c 'alter table orders enable row level security;' >/dev/null
+$PSQL -c 'create policy orders_read on orders for select using (true);' >/dev/null
+wait_for_log "rls enabled on public.orders" 15
+wait_for_log "policy orders_read created on public.orders" 15
 sleep 1
 
 echo "== 8. Stop watcher =="
@@ -305,6 +336,94 @@ echo "== 9f. seed target assertions =="
 [ -f "$OUT/seed.sql" ] || fail "seed.sql missing"
 awk 'index($0, "insert into \"public\".\"users\"") { f = 1 } END { exit !f }' "$OUT/seed.sql" || fail "seed lacks users inserts"
 awk 'index($0, "setval") { f = 1 } END { exit !f }' "$OUT/seed.sql" || fail "seed lacks sequence resync"
+
+echo "== 9g. final-wave target assertions =="
+[ -f "$OUT/effect/orders.mjs" ] || fail "effect schema missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/effect/orders.mjs'), import('effect'), import('postgres')]).then(async ([m, e, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const rows = await sql.unsafe('select * from orders limit 5');
+  const decode = e.Schema.decodeUnknownEither(m.ordersRow);
+  for (const row of rows) {
+    const r = decode(row);
+    if (r._tag !== 'Right') { console.error('effect rejected a live row: ' + String(r.left).slice(0, 300)); process.exit(1); }
+  }
+  console.log('effect live: ' + rows.length + '/' + rows.length + ' rows decoded');
+  await sql.end();
+})") || fail "effect schema rejected live rows"
+[ -f "$OUT/rest/orders.mjs" ] || fail "rest routes missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/rest/orders.mjs'), import('postgres')]).then(async ([m, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const app = m.createOrdersRoutes(sql);
+  const list = await app.request('/');
+  if (list.status !== 200) { console.error('list status ' + list.status); process.exit(1); }
+  const rows = await list.json();
+  if (!rows.length) { console.error('rest list empty'); process.exit(1); }
+  const one = await app.request('/' + rows[0].id);
+  if (one.status !== 200) { console.error('byId status ' + one.status); process.exit(1); }
+  const bad = await app.request('/', { method: 'POST', body: JSON.stringify({ status: 'nope' }), headers: { 'content-type': 'application/json' } });
+  if (bad.status !== 400) { console.error('invalid insert not rejected: ' + bad.status); process.exit(1); }
+  const good = await app.request('/', { method: 'POST', body: JSON.stringify({ user_id: rows[0].user_id, status: 'paid', total: '7.50', tags: ['e2e-rest'] }), headers: { 'content-type': 'application/json' } });
+  if (good.status !== 201) { console.error('valid insert failed: ' + good.status + ' ' + (await good.text())); process.exit(1); }
+  console.log('rest live: list ' + rows.length + ', byId ok, 400 on invalid, 201 on create');
+  await sql.end();
+})") || fail "hono routes failed against live db"
+[ -f "$OUT/service/orders.mjs" ] || fail "service repo missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/service/orders.mjs'), import('postgres')]).then(async ([m, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const repo = m.createOrdersRepo(sql);
+  const rows = await repo.list({ limit: 5 });
+  if (!rows.length) { console.error('service list empty'); process.exit(1); }
+  const created = await repo.create({ user_id: rows[0].user_id, status: 'paid', total: '8.25', tags: ['e2e-svc'] });
+  const updated = await repo.update(created.id, { total: '9.00' });
+  if (updated.total !== '9.00') { console.error('update wrong: ' + updated.total); process.exit(1); }
+  if (!(await repo.remove(created.id))) { console.error('remove failed'); process.exit(1); }
+  if ((await repo.findById(created.id)) !== null) { console.error('row survived remove'); process.exit(1); }
+  let rejected = false;
+  await repo.create({ user_id: rows[0].user_id, status: 'bogus', total: 'x', tags: [] }).catch(() => { rejected = true; });
+  if (!rejected) { console.error('invalid create accepted'); process.exit(1); }
+  console.log('service live: list, create, update, remove, invalid rejected');
+  await sql.end();
+})") || fail "service repo failed against live db"
+[ -f "$OUT/orpc/orders.mjs" ] || fail "orpc router missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/orpc/orders.mjs'), import('@orpc/server'), import('postgres')]).then(async ([m, o, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const router = m.createOrdersOrpc(sql);
+  const rows = await o.call(router.list, undefined);
+  if (!rows.length) { console.error('orpc list empty'); process.exit(1); }
+  const one = await o.call(router.byId, { id: rows[0].id });
+  if (!one || one.id !== rows[0].id) { console.error('orpc byId wrong'); process.exit(1); }
+  let rejected = false;
+  await o.call(router.create, { status: 'nope' }).catch(() => { rejected = true; });
+  if (!rejected) { console.error('orpc accepted invalid create'); process.exit(1); }
+  console.log('orpc live: list ' + rows.length + ', byId ok, invalid rejected');
+  await sql.end();
+})") || fail "orpc router failed against live db"
+[ -f "$OUT/graphql-schema.mjs" ] || fail "graphql schema missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/graphql-schema.mjs'), import('graphql'), import('postgres')]).then(async ([m, g, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const schema = m.createGraphqlSchema(sql);
+  const result = await g.graphql({ schema, source: '{ orders { id total status } }' });
+  if (result.errors) { console.error('graphql errors: ' + result.errors[0]); process.exit(1); }
+  const orders = result.data.orders;
+  if (!orders.length || typeof orders[0].total !== 'string') { console.error('graphql rows wrong'); process.exit(1); }
+  console.log('graphql live: orders ' + orders.length + ' rows');
+  await sql.end();
+})") || fail "graphql schema failed against live db"
+[ -f "$OUT/structure.pgtap.sql" ] || fail "pgtap file missing"
+awk "index(\$0, \"has_table('public', 'orders'\") { f = 1 } END { exit !f }" "$OUT/structure.pgtap.sql" || fail "pgtap lacks orders has_table"
+awk "index(\$0, \"rls_enabled('public', 'orders')\") { f = 1 } END { exit !f }" "$OUT/structure.pgtap.sql" || fail "pgtap lacks live rls assertion"
+awk "index(\$0, \"policies_are('public', 'orders', array['orders_read']\") { f = 1 } END { exit !f }" "$OUT/structure.pgtap.sql" || fail "pgtap lacks live policy assertion"
+[ -f "$OUT/rls-skeletons.sql" ] || fail "rls skeletons missing"
+awk 'index($0, "orders: rls enabled, 1 policies exist") { f = 1 } END { exit !f }' "$OUT/rls-skeletons.sql" || fail "covered table restubbed or missing"
+awk 'index($0, "alter table \"public\".\"users\" enable row level security;") { f = 1 } END { exit !f }' "$OUT/rls-skeletons.sql" || fail "uncovered table not stubbed"
+awk 'index($0, "TODO: no owner or tenant column detected") { f = 1 } END { exit !f }' "$OUT/rls-skeletons.sql" || fail "heuristic miss not surfaced honestly"
+[ -f "$OUT/pgmq-clients.mjs" ] || fail "pgmq clients missing"
+awk 'index($0, "export const queues = {};") { f = 1 } END { exit !f }' "$OUT/pgmq-clients.mjs" || fail "pgmq stub wrong without pgmq schema"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

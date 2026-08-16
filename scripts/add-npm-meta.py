@@ -90,6 +90,38 @@ META = {
         "description": "Deterministic FK-aware seed.sql generated from live Postgres by supawatch: topological order, identity overriding, sequence resync.",
         "keywords": BASE_KEYWORDS + ["seed", "fixtures", "seed-sql", "supabase-seed"],
     },
+    "target-effect": {
+        "description": "Effect Schema structs generated from live Postgres by supawatch, mapped to what the driver actually returns.",
+        "keywords": BASE_KEYWORDS + ["effect", "effect-schema", "validation"],
+    },
+    "target-rest": {
+        "description": "Hono route modules generated from live Postgres by supawatch, input-validated by the generated Zod schemas.",
+        "keywords": BASE_KEYWORDS + ["hono", "rest", "api", "edge-functions"],
+    },
+    "target-service": {
+        "description": "Typed repository layers generated from live Postgres by supawatch: list, findById, create, update, remove over postgres.js.",
+        "keywords": BASE_KEYWORDS + ["repository", "service-layer", "crud"],
+    },
+    "target-orpc": {
+        "description": "oRPC routers generated from live Postgres by supawatch, input-validated by the generated Zod schemas.",
+        "keywords": BASE_KEYWORDS + ["orpc", "router", "api"],
+    },
+    "target-graphql": {
+        "description": "An executable Pothos GraphQL schema generated from live Postgres by supawatch, typed by driver truth.",
+        "keywords": BASE_KEYWORDS + ["graphql", "pothos", "api"],
+    },
+    "target-pgtap": {
+        "description": "A plan-counted pgTAP structural test suite generated from live Postgres by supawatch, RLS and policy assertions included.",
+        "keywords": BASE_KEYWORDS + ["pgtap", "testing", "pg_prove", "rls"],
+    },
+    "target-rls": {
+        "description": "Row level security policy skeletons generated from live Postgres by supawatch for exactly the tables that need attention.",
+        "keywords": BASE_KEYWORDS + ["rls", "row-level-security", "policies", "auth"],
+    },
+    "target-pgmq": {
+        "description": "Typed pgmq queue clients generated from live Postgres by supawatch, one per detected queue.",
+        "keywords": BASE_KEYWORDS + ["pgmq", "queue", "jobs", "workers"],
+    },
     "verify": {
         "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
         "keywords": BASE_KEYWORDS + ["pglite", "testing", "verification"],

@@ -39,9 +39,22 @@ export interface ForeignKey {
   referencedColumns: string[];
 }
 
+export interface RlsPolicy {
+  name: string;
+  command: string; // ALL, SELECT, INSERT, UPDATE, DELETE
+  permissive: boolean;
+  roles: string[];
+  using: string | null;
+  withCheck: string | null;
+}
+
 export interface Table {
   schema: string;
   name: string;
+  // Row-level security state and existing policies, straight from
+  // pg_class.relrowsecurity and the pg_policies view.
+  rlsEnabled: boolean;
+  policies: RlsPolicy[];
   // Column names of the primary key, empty when the table has none.
   primaryKey: string[];
   foreignKeys: ForeignKey[];
