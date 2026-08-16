@@ -3,3 +3,6 @@ dist/
 *.log
 e2e/out-work/
 e2e/tars/
+
+# local torture staging dirs, never committed
+.torture*-local/
