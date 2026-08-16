@@ -1,0 +1,45 @@
+{
+  "name": "@supawatch/target-dictionary",
+  "version": "0.2.0",
+  "description": "A markdown data dictionary generated from live Postgres by supawatch, comments sourced from the database itself.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "data-dictionary",
+    "documentation",
+    "comments"
+  ],
+  "license": "MIT",
+  "author": "Omar Dulaimi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omar-dulaimi/supawatch.git",
+    "directory": "packages/target-dictionary"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supawatch/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.0"
+  }
+}

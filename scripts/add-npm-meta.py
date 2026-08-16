@@ -66,6 +66,18 @@ META = {
         "description": "tRPC routers generated from live Postgres by supawatch, input-validated by the generated Zod schemas.",
         "keywords": BASE_KEYWORDS + ["trpc", "router", "api"],
     },
+    "target-schema-card": {
+        "description": "A compact, token-lean schema card generated from live Postgres by supawatch for LLM prompts and agent context.",
+        "keywords": BASE_KEYWORDS + ["llm", "prompt", "context", "ai"],
+    },
+    "target-dictionary": {
+        "description": "A markdown data dictionary generated from live Postgres by supawatch, comments sourced from the database itself.",
+        "keywords": BASE_KEYWORDS + ["data-dictionary", "documentation", "comments"],
+    },
+    "target-realtime": {
+        "description": "Typed supabase-js realtime payload aliases generated from live Postgres by supawatch, shaped by the measured wire profile.",
+        "keywords": BASE_KEYWORDS + ["realtime", "supabase-js", "payloads"],
+    },
     "verify": {
         "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
         "keywords": BASE_KEYWORDS + ["pglite", "testing", "verification"],

@@ -103,6 +103,12 @@ function diffTable(prev: Table, next: Table): string[] {
         `${name}.${colName} now ${nextC.nullable ? "nullable" : "not null"}`,
       );
     }
+    if ((prevC.comment ?? "") !== (nextC.comment ?? "")) {
+      changes.push(`comment on ${name}.${colName} changed`);
+    }
+  }
+  if ((prev.comment ?? "") !== (next.comment ?? "")) {
+    changes.push(`comment on ${name} changed`);
   }
   return changes;
 }

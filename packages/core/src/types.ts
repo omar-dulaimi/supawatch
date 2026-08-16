@@ -27,6 +27,7 @@ export interface Column {
   // 'default' identity behaves like hasDefault for inserts.
   identity: "always" | "default" | null;
   generated: boolean;
+  comment?: string;
   enumRef?: string;
 }
 
@@ -48,6 +49,7 @@ export interface Table {
   // reports every view column as nullable regardless of the underlying
   // column, and consumers deserve to know that is why.
   kind: "table" | "view";
+  comment?: string;
   columns: Column[];
 }
 

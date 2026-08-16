@@ -29,6 +29,9 @@ importers:
       '@supawatch/target-arktype':
         specifier: workspace:*
         version: link:../target-arktype
+      '@supawatch/target-dictionary':
+        specifier: workspace:*
+        version: link:../target-dictionary
       '@supawatch/target-erd':
         specifier: workspace:*
         version: link:../target-erd
@@ -44,6 +47,12 @@ importers:
       '@supawatch/target-json-schema':
         specifier: workspace:*
         version: link:../target-json-schema
+      '@supawatch/target-realtime':
+        specifier: workspace:*
+        version: link:../target-realtime
+      '@supawatch/target-schema-card':
+        specifier: workspace:*
+        version: link:../target-schema-card
       '@supawatch/target-schema-lock':
         specifier: workspace:*
         version: link:../target-schema-lock
@@ -99,6 +108,19 @@ importers:
       arktype:
         specifier: ^2.1.0
         version: 2.2.3
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
+  packages/target-dictionary:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^22.20.1
@@ -170,6 +192,32 @@ importers:
       ajv:
         specifier: ^8.17.0
         version: 8.20.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
+  packages/target-realtime:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/node':
+        specifier: ^22.20.1
+        version: 22.20.1
+      typescript:
+        specifier: ^5.9.0
+        version: 5.9.3
+
+  packages/target-schema-card:
+    dependencies:
+      '@supawatch/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^22.20.1
@@ -280,6 +328,9 @@ importers:
       '@supawatch/target-arktype':
         specifier: workspace:*
         version: link:../target-arktype
+      '@supawatch/target-dictionary':
+        specifier: workspace:*
+        version: link:../target-dictionary
       '@supawatch/target-erd':
         specifier: workspace:*
         version: link:../target-erd
@@ -295,6 +346,12 @@ importers:
       '@supawatch/target-json-schema':
         specifier: workspace:*
         version: link:../target-json-schema
+      '@supawatch/target-realtime':
+        specifier: workspace:*
+        version: link:../target-realtime
+      '@supawatch/target-schema-card':
+        specifier: workspace:*
+        version: link:../target-schema-card
       '@supawatch/target-schema-lock':
         specifier: workspace:*
         version: link:../target-schema-lock
