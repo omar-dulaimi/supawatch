@@ -1,8 +1,15 @@
 name: release
 
+# Fires only when a release can actually move: a changeset lands or is
+# consumed (the version PR merge deletes them), or this workflow itself
+# changes. Docs, scripts, and plain code pushes stay silent; recovery
+# publishes go through workflow_dispatch.
 on:
   push:
     branches: [main]
+    paths:
+      - ".changeset/**"
+      - ".github/workflows/release.yml"
   workflow_dispatch:
 
 concurrency: release-${{ github.ref }}
