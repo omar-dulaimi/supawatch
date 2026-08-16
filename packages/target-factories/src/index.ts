@@ -8,6 +8,7 @@ import type {
   TargetCapabilities,
   TargetOptions,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // Emits one typed fixture factory per table: makeTasks(overrides) returns
 // a full, deterministic row in driver shape. Every generated factory row
@@ -51,12 +52,12 @@ function defaultExpr(runtime: RuntimeType, seedPath: string): string {
   }
 }
 
-function baseNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
-export function exportNameFor(table: Table): string {
-  const base = baseNameFor(table);
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  const base = baseNameFor(table, snapshot);
   return "make" + base.charAt(0).toUpperCase() + base.slice(1);
 }
 
@@ -74,24 +75,24 @@ export class FactoriesTarget implements Target<FactoriesTargetOptions> {
     dateInstances: true,
   };
 
-  renderTable(table: Table, _snapshot: Snapshot, _opts: FactoriesTargetOptions): Rendered {
+  renderTable(table: Table, snapshot: Snapshot, _opts: FactoriesTargetOptions): Rendered {
     const fields = table.columns
       .map((col) => `    ${JSON.stringify(col.name)}: ${fieldDefault(table, col)},`)
       .join("\n");
     const body = [
-      `export function ${exportNameFor(table)}(overrides = {}) {`,
+      `export function ${exportNameFor(table, snapshot)}(overrides = {}) {`,
       "  return {",
       fields,
       "    ...overrides,",
       "  };",
       "}",
     ].join("\n");
-    return { imports: [], body, exportName: exportNameFor(table) };
+    return { imports: [], body, exportName: exportNameFor(table, snapshot) };
   }
 
-  renderTypes(table: Table, _snapshot: Snapshot, _opts: FactoriesTargetOptions): string {
-    const name = exportNameFor(table);
-    const base = baseNameFor(table);
+  renderTypes(table: Table, snapshot: Snapshot, _opts: FactoriesTargetOptions): string {
+    const name = exportNameFor(table, snapshot);
+    const base = baseNameFor(table, snapshot);
     const rowType = `${base}FactoryRow`;
     const tsType = (runtime: RuntimeType): string => {
       switch (runtime.kind) {

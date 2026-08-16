@@ -10,6 +10,7 @@ import {
   type Target,
   type TargetOptions,
 } from "@supawatch/core";
+import { fileBaseName } from "@supawatch/core";
 import type { TriggerSource } from "./sources.js";
 
 export interface TargetRun {
@@ -133,9 +134,9 @@ export class Watcher {
     // With one schema, files keep bare table names. With several, every
     // file is prefixed with its schema, because two schemas can hold
     // same-named tables and the last write would silently win otherwise.
-    const multiSchema = new Set(next.tables.map((t) => t.schema)).size > 1;
+    // Single source of truth with the emitters' own import paths.
     const fileBase = (t: { schema: string; name: string }) =>
-      multiSchema ? `${t.schema}.${t.name}` : t.name;
+      fileBaseName(t, next);
 
     for (const run of this.opts.targets) {
       // Snapshot-level targets (the Database bridge) emit whole files;
@@ -153,8 +154,24 @@ export class Watcher {
         continue;
       }
       const keep = new Set<string>();
+      // Sanitized export names can collide ("a b" and "a-b" both become
+      // a_b; two schemas can hold same-named tables). Colliding names in
+      // one barrel are ambiguous star exports, which ESM silently DROPS,
+      // so both schemas would vanish without an error. Fail loudly
+      // instead.
+      const exportOwners = new Map<string, string>();
       for (const table of next.tables) {
         const rendered = run.target.renderTable(table, next, run.options);
+        const tableKey = `${table.schema}.${table.name}`;
+        const owner = exportOwners.get(rendered.exportName);
+        if (owner !== undefined && owner !== tableKey) {
+          throw new Error(
+            `target ${run.target.name}: ${owner} and ${tableKey} both emit the export "${rendered.exportName}"; ` +
+              `an ESM barrel silently drops ambiguous names, so this cannot be generated. ` +
+              `Rename one relation, or generate the schemas into separate outDirs via per-target "path".`,
+          );
+        }
+        exportOwners.set(rendered.exportName, tableKey);
         const base = `${fileBase(table)}${run.target.fileExtension}`;
         const file = path.join(run.outDir, base);
         const content = run.target.assembleFile

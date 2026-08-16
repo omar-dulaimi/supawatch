@@ -67,7 +67,9 @@ export async function introspect(
 ): Promise<Snapshot> {
   const includeViews = opts.includeViews !== false;
   const profile = opts.profile ?? "postgres-js";
-  const relkinds = includeViews ? ["r", "v"] : ["r"];
+  // 'r' plain tables, 'p' partitioned parents (their internal partitions
+  // are excluded below), 'v' views, 'm' materialized views.
+  const relkinds = includeViews ? ["r", "p", "v", "m"] : ["r", "p"];
 
   const enumRows = await query<EnumRow>(
     `select n.nspname as enum_schema, t.typname as enum_name, e.enumlabel as label
@@ -217,6 +219,7 @@ export async function introspect(
      left join effective el_eff on el_eff.start_oid = el.oid
      where n.nspname = any($1)
        and c.relkind = any($2)
+       and not c.relispartition
        and a.attnum > 0
        and not a.attisdropped
      order by c.relname, a.attnum`,
@@ -398,7 +401,7 @@ export async function introspect(
       table = {
         schema: r.table_schema,
         name: r.table_name,
-        kind: r.rel_kind === "v" ? "view" : "table",
+        kind: r.rel_kind === "v" || r.rel_kind === "m" ? "view" : "table",
         rlsEnabled: r.rls_enabled === true,
         policies: policiesByTable.get(key) ?? [],
         ...(r.table_comment ? { comment: r.table_comment } : {}),
@@ -447,10 +450,8 @@ export async function introspect(
       ...(r.column_comment ? { comment: r.column_comment } : {}),
     };
     if (runtime.kind === "enum") col.enumRef = r.effective_type_name;
-    // Enum arrays keep a reference to their element enum even when the
-    // postgres-js profile collapses them to a raw-literal string, so
-    // wire-profile targets (realtime, the Database bridge) can recover
-    // the real labels.
+    // Enum arrays keep a reference to their element enum so targets can
+    // name the type (seed casts, the Database bridge).
     if (elementEnumRef) col.enumRef = elementEnumRef;
     table.columns.push(col);
   }

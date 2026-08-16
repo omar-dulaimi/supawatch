@@ -67,7 +67,52 @@ export const DRIVER_DELTAS = [
     detail:
       "PGlite parses int8 to a JS BigInt; postgres.js returns its decimal string. Normalized: BigInt -> String(value).",
   },
+  {
+    id: "enum-array-literal-vs-array",
+    detail:
+      "PGlite returns enum arrays as the raw pg literal; a fresh postgres.js connection parses them to real arrays (measured; parsers are fetched at connect). Normalized: literal -> parsed array on enum-array columns.",
+  },
 ] as const;
+
+// Minimal pg array-literal parser for the enum-array delta: handles
+// quoted elements, doubled quotes, and backslash escapes.
+export function parsePgTextArray(literal: string): string[] {
+  const inner = literal.slice(1, -1);
+  if (inner === "") return [];
+  const out: string[] = [];
+  let cur = "";
+  let quoted = false;
+  let wasQuoted = false;
+  for (let i = 0; i < inner.length; i++) {
+    const ch = inner[i];
+    if (quoted) {
+      if (ch === "\\") {
+        cur += inner[++i];
+      } else if (ch === '"') {
+        if (inner[i + 1] === '"') {
+          cur += '"';
+          i++;
+        } else {
+          quoted = false;
+        }
+      } else {
+        cur += ch;
+      }
+    } else if (ch === '"') {
+      quoted = true;
+      wasQuoted = true;
+    } else if (ch === ",") {
+      out.push(cur);
+      cur = "";
+      wasQuoted = false;
+    } else {
+      cur += ch;
+    }
+  }
+  out.push(cur);
+  void wasQuoted;
+  return out;
+}
 
 function normalize(value: unknown): unknown {
   if (typeof value === "bigint") return value.toString();
@@ -178,6 +223,19 @@ export async function runHarness(opts: {
       const rows = await query(
         `select * from "${table.name}" limit 10`,
       );
+
+      // The enum-array-literal-vs-array delta: PGlite hands back the raw
+      // literal, generated schemas expect the parsed array that a fresh
+      // postgres.js connection returns.
+      for (const col of table.columns) {
+        if (col.runtime.kind !== "array" || col.runtime.element.kind !== "enum") continue;
+        for (const row of rows) {
+          const v = (row as Record<string, unknown>)[col.name];
+          if (typeof v === "string") {
+            (row as Record<string, unknown>)[col.name] = parsePgTextArray(v);
+          }
+        }
+      }
 
       // Ground truth: every real row must be accepted by every target.
       for (const [name, { schemaByTable, verifier }] of loaded) {

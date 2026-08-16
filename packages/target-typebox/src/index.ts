@@ -12,6 +12,7 @@ import type {
   Verdict,
   Verifier,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 import type { TSchema } from "@sinclair/typebox";
 
 export interface TypeboxTargetOptions extends TargetOptions {
@@ -71,12 +72,12 @@ function tsType(runtime: RuntimeType): string {
   }
 }
 
-export function exportNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Row";
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot) + "Row";
 }
 
-function baseNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot);
 }
 
 function fieldSchema(col: Column): string {
@@ -135,7 +136,7 @@ export class TypeboxTarget implements Target<TypeboxTargetOptions> {
 
   renderTable(
     table: Table,
-    _snapshot: Snapshot,
+    snapshot: Snapshot,
     opts: TypeboxTargetOptions,
   ): Rendered {
     const strict = opts.strict !== false;
@@ -144,24 +145,24 @@ export class TypeboxTarget implements Target<TypeboxTargetOptions> {
       .join("\n");
     const tail = strict ? `, { additionalProperties: false }` : "";
     const parts = [
-      `export const ${exportNameFor(table)} = Type.Object({\n${fields}\n}${tail});`,
+      `export const ${exportNameFor(table, snapshot)} = Type.Object({\n${fields}\n}${tail});`,
     ];
     if (opts.emit?.insert && table.kind === "table") {
-      parts.push(variantBody(table, strict, `${baseNameFor(table)}Insert`, insertOptional));
+      parts.push(variantBody(table, strict, `${baseNameFor(table, snapshot)}Insert`, insertOptional));
     }
     if (opts.emit?.update && table.kind === "table") {
-      parts.push(variantBody(table, strict, `${baseNameFor(table)}Update`, () => true));
+      parts.push(variantBody(table, strict, `${baseNameFor(table, snapshot)}Update`, () => true));
     }
     return {
       imports: [{ from: "@sinclair/typebox", names: ["Type"] }],
       body: parts.join("\n\n"),
-      exportName: exportNameFor(table),
+      exportName: exportNameFor(table, snapshot),
     };
   }
 
-  renderTypes(table: Table, _snapshot: Snapshot, opts: TypeboxTargetOptions): string {
-    const name = exportNameFor(table);
-    const base = baseNameFor(table);
+  renderTypes(table: Table, snapshot: Snapshot, opts: TypeboxTargetOptions): string {
+    const name = exportNameFor(table, snapshot);
+    const base = baseNameFor(table, snapshot);
     const rowType = `${base}RowType`;
     const typeOf = (col: Column) => {
       const override = jsonOverrideFor(table, col, opts.jsonTypes);

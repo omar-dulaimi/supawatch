@@ -11,6 +11,7 @@ import { JsonSchemaTarget } from "@supawatch/target-json-schema";
 import { FastCheckTarget } from "@supawatch/target-fast-check";
 import { ZodTarget } from "@supawatch/target-zod";
 import { FIXTURE_SQL } from "@supawatch/verify";
+import { parsePgTextArray } from "@supawatch/verify";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,7 +21,10 @@ function querierFromPglite(db: PGlite): Querier {
     return result.rows.map((row) => {
       const out: Record<string, unknown> = {};
       for (const [k, v] of Object.entries(row)) {
-        out[k] = typeof v === "bigint" ? v.toString() : v;
+        // enum-array-literal-vs-array delta: the fixture's enum-array
+        // column arrives as the raw literal from PGlite.
+        if (k === "states" && typeof v === "string") out[k] = parsePgTextArray(v);
+        else out[k] = typeof v === "bigint" ? v.toString() : v;
       }
       return out;
     }) as T[];

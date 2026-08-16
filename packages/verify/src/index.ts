@@ -1,6 +1,7 @@
 export {
   runHarness,
   DRIVER_DELTAS,
+  parsePgTextArray,
   type AllowedDivergence,
   type GroundTruthRow,
   type HarnessResult,

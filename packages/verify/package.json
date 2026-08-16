@@ -70,6 +70,7 @@
     "@supawatch/target-typebox": "workspace:*",
     "@supawatch/target-valibot": "workspace:*",
     "@supawatch/target-zod": "workspace:*",
+    "@supawatch/watch": "workspace:*",
     "@trpc/server": "^11.18.0",
     "@types/node": "^22.20.1",
     "ai": "^5.0.237",

@@ -9,6 +9,7 @@ import {
   type TargetCapabilities,
   type TargetOptions,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // Emits realtime.types.ts: per-table payload aliases for supabase-js
 // realtime channels, closing the documented realtime-js gap where
@@ -48,10 +49,6 @@ function wireRuntime(col: Column, snapshot: Snapshot): RuntimeType {
   if (col.runtime.kind === "array") {
     return arrayRuntimeFor(col.runtime.element, 1, "supabase-js");
   }
-  if (col.runtime.kind === "string" && col.runtime.format === "array-literal") {
-    const e = snapshot.enums.find((x) => x.name === col.enumRef);
-    if (e) return { kind: "array", element: { kind: "enum", labels: e.labels } };
-  }
   const kind = snapshot.enums.some((e) => e.name === col.pgTypeName)
     ? "e"
     : snapshot.composites.some((c) => c.name === col.pgTypeName)
@@ -60,8 +57,8 @@ function wireRuntime(col: Column, snapshot: Snapshot): RuntimeType {
   return runtimeFor(col.pgTypeName, kind, { enums: snapshot.enums }, "supabase-js");
 }
 
-function baseNameFor(name: string): string {
-  const clean = name.replace(/[^a-zA-Z0-9_]/g, "_");
+function baseNameFor(table: { schema: string; name: string }, snapshot: Snapshot): string {
+  const clean = exportBaseName(table, snapshot);
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
@@ -88,7 +85,7 @@ export class RealtimeTarget implements Target<RealtimeTargetOptions> {
       "",
     ];
     for (const table of snapshot.tables.filter((t) => t.kind === "table")) {
-      const base = baseNameFor(table.name);
+      const base = baseNameFor(table, snapshot);
       const fields = table.columns
         .map((col) => {
           const t = tsType(wireRuntime(col, snapshot), snapshot);

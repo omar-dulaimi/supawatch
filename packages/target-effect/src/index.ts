@@ -12,6 +12,7 @@ import type {
   Verdict,
   Verifier,
 } from "@supawatch/core";
+import { exportBaseName, fileBaseName } from "@supawatch/core";
 
 // The Effect Schema target: one Schema.Struct per table from driver
 // truth. The verifier decodes with onExcessProperty error, so strict
@@ -53,8 +54,8 @@ function effectExpr(runtime: RuntimeType): string {
   }
 }
 
-export function exportNameFor(table: Table): string {
-  return table.name.replace(/[^a-zA-Z0-9_]/g, "_") + "Row";
+export function exportNameFor(table: Table, snapshot: Snapshot): string {
+  return exportBaseName(table, snapshot) + "Row";
 }
 
 function fieldSchema(col: Column): string {
@@ -74,14 +75,14 @@ export class EffectTarget implements Target<EffectTargetOptions> {
     dateInstances: true,
   };
 
-  renderTable(table: Table, _snapshot: Snapshot, _opts: EffectTargetOptions): Rendered {
+  renderTable(table: Table, snapshot: Snapshot, _opts: EffectTargetOptions): Rendered {
     const fields = table.columns
       .map((col) => `  ${JSON.stringify(col.name)}: ${fieldSchema(col)},`)
       .join("\n");
     return {
       imports: [{ from: "effect", names: ["Schema"] }],
-      body: `export const ${exportNameFor(table)} = Schema.Struct({\n${fields}\n});`,
-      exportName: exportNameFor(table),
+      body: `export const ${exportNameFor(table, snapshot)} = Schema.Struct({\n${fields}\n});`,
+      exportName: exportNameFor(table, snapshot),
     };
   }
 

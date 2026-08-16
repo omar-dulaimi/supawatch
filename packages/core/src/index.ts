@@ -30,3 +30,4 @@ export {
   type DriverProfile,
 } from "./runtime-map.js";
 export { assemble, atomicSink, type FileSink } from "./emit.js";
+export { exportBaseName, fileBaseName, isMultiSchema } from "./naming.js";

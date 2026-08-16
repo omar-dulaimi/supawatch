@@ -597,6 +597,9 @@ importers:
       '@supawatch/target-zod':
         specifier: workspace:*
         version: link:../target-zod
+      '@supawatch/watch':
+        specifier: workspace:*
+        version: link:../watch
       '@trpc/server':
         specifier: ^11.18.0
         version: 11.18.0(typescript@5.9.3)

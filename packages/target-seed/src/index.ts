@@ -74,7 +74,6 @@ function literalFor(
         case "bigint":
           return sqlString(String(1 + Math.floor(rand() * 100000)));
         case "composite":
-        case "array-literal":
           return null; // cannot construct honestly from here
         default:
           return sqlString(`${table.name} ${col.name} ${rowIndex + 1}`);
