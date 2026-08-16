@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-valibot",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Valibot schemas generated from live Postgres by supawatch, mapped to what the driver actually returns.",
   "keywords": [
     "supabase",
