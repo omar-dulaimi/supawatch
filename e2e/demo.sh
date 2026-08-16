@@ -40,7 +40,7 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 V=$(cd "$ROOT/packages/core" && node -p "require('./package.json').version")
@@ -52,6 +52,7 @@ cat > out-work/package.json <<PKG
   "dependencies": {
     "supawatch": "file:../tars/supawatch-${V}.tgz",
     "@sinclair/typebox": "^0.34.0",
+    "fast-check": "^4.0.0",
     "arktype": "^2.1.0",
     "valibot": "^1.1.0",
     "zod": "^4.0.0"
@@ -59,6 +60,10 @@ cat > out-work/package.json <<PKG
   "overrides": {
     "@supawatch/core": "file:../tars/supawatch-core-${V}.tgz",
     "@supawatch/target-arktype": "file:../tars/supawatch-target-arktype-${V}.tgz",
+    "@supawatch/target-erd": "file:../tars/supawatch-target-erd-${V}.tgz",
+    "@supawatch/target-schema-lock": "file:../tars/supawatch-target-schema-lock-${V}.tgz",
+    "@supawatch/target-json-schema": "file:../tars/supawatch-target-json-schema-${V}.tgz",
+    "@supawatch/target-fast-check": "file:../tars/supawatch-target-fast-check-${V}.tgz",
     "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V}.tgz",
     "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V}.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V}.tgz",
@@ -91,6 +96,10 @@ export default defineConfig({
     { kind: "valibot", strict: true },
     { kind: "arktype", strict: true },
     { kind: "typebox", strict: true },
+    { kind: "erd" },
+    { kind: "schema-lock" },
+    { kind: "json-schema", strict: true },
+    { kind: "fast-check" },
   ],
 });
 CFG
@@ -156,6 +165,25 @@ awk 'index($0, "\"id\": z.number().int().optional()") { f = 1 } END { exit !f }'
 awk 'index($0, "ordersUpdate") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "update variant missing"
 awk 'index($0, "source?: string") { f = 1 } END { exit !f }' "$OUT/zod/orders.d.mts" || fail "jsonTypes override missing from d.mts"
 node -e "import('file://$OUT/zod/index.mjs').then((m) => { if (!m.ordersRow || !m.usersRow || !m.ordersInsert) { console.error('barrel exports incomplete'); process.exit(1); } })" || fail "barrel does not import cleanly"
+
+echo "== 9b. batch-1 target assertions =="
+[ -f "$OUT/schema.erd.md" ] || fail "erd missing"
+awk 'index($0, "erDiagram") { f = 1 } END { exit !f }' "$OUT/schema.erd.md" || fail "erd lacks erDiagram"
+awk 'index($0, "orders }o--|| users") { f = 1 } END { exit !f }' "$OUT/schema.erd.md" || fail "erd lacks orders->users edge"
+[ -f "$OUT/schema.lock.json" ] || fail "schema lock missing"
+node -e "const l = require('$OUT/schema.lock.json'); if (l.format !== 1 || !l.tables.some(t => t.name === 'orders')) process.exit(1)" || fail "schema lock malformed"
+[ -f "$OUT/json-schema/orders.schema.json" ] || fail "json schema missing"
+node -e "const s = require('$OUT/json-schema/orders.schema.json'); if (s.additionalProperties !== false || !s.properties.total) process.exit(1)" || fail "json schema malformed"
+[ -f "$OUT/fast-check/orders.mjs" ] || fail "fast-check arb missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/fast-check/orders.mjs'), import('$OUT/zod/orders.mjs'), import('fast-check')]).then(([a, z, f]) => {
+  const fc = f.default;
+  for (const row of fc.sample(a.ordersRow ?? a.ordersArb, 5)) {
+    const v = z.ordersRow.safeParse(row);
+    if (!v.success) { console.error('arb row rejected by zod:', v.error.issues[0]); process.exit(1); }
+  }
+  console.log('fast-check arbs satisfy zod live: 5/5');
+})") || fail "fast-check arbs do not satisfy zod"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

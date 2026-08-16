@@ -41,6 +41,8 @@ export interface ForeignKey {
 export interface Table {
   schema: string;
   name: string;
+  // Column names of the primary key, empty when the table has none.
+  primaryKey: string[];
   foreignKeys: ForeignKey[];
   // Views are tables to a reader; the marker exists because Postgres
   // reports every view column as nullable regardless of the underlying
@@ -138,6 +140,11 @@ export interface Target<TOptions extends TargetOptions = TargetOptions> {
   readonly name: string;
   readonly capabilities: TargetCapabilities;
   readonly fileExtension: string;
+  // Non-module targets (JSON, markdown) opt out of the export barrel.
+  readonly barrel?: boolean;
+  // Overrides core's JS assembly for targets whose files are not ES
+  // modules; receives the Rendered and returns the exact file content.
+  assembleFile?(rendered: Rendered): string;
   renderTable(table: Table, snapshot: Snapshot, opts: TOptions): Rendered;
   renderTypes?(table: Table, snapshot: Snapshot, opts: TOptions): string;
   // A snapshot-level target (like the supabase Database bridge) emits

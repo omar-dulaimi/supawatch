@@ -45,6 +45,37 @@ export const TARGETS: readonly TargetEntry[] = [
     outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "typebox"),
   },
   {
+    kind: "erd",
+    specifier: "@supawatch/target-erd",
+    load: () => import("@supawatch/target-erd"),
+    construct: (m) => new (m as { ErdTarget: new () => Target }).ErdTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
+    kind: "schema-lock",
+    specifier: "@supawatch/target-schema-lock",
+    load: () => import("@supawatch/target-schema-lock"),
+    construct: (m) =>
+      new (m as { SchemaLockTarget: new () => Target }).SchemaLockTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
+    kind: "json-schema",
+    specifier: "@supawatch/target-json-schema",
+    load: () => import("@supawatch/target-json-schema"),
+    construct: (m) =>
+      new (m as { JsonSchemaTarget: new () => Target }).JsonSchemaTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "json-schema"),
+  },
+  {
+    kind: "fast-check",
+    specifier: "@supawatch/target-fast-check",
+    load: () => import("@supawatch/target-fast-check"),
+    construct: (m) =>
+      new (m as { FastCheckTarget: new () => Target }).FastCheckTarget(),
+    outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "fast-check"),
+  },
+  {
     kind: "supabase-types",
     specifier: "@supawatch/target-supabase-types",
     load: () => import("@supawatch/target-supabase-types"),
