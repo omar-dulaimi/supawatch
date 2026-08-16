@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-supabase-types",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "A supabase-js compatible Database interface generated from live Postgres by supawatch, foreign-key relationships included.",
   "keywords": [
     "supabase",

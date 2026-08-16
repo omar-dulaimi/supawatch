@@ -1,5 +1,74 @@
 # @supawatch/target-supabase-types
 
+## 0.8.0
+
+### Minor Changes
+
+- c95d248: Six defects found by driving the pipeline over an advanced-schema
+  torture database, all fixed:
+
+  - Partitioned parents (relkind p) were invisible while their internal
+    partitions leaked through as ordinary tables; the parent is now a
+    table in the snapshot and partitions are excluded. Materialized views
+    were invisible entirely; they are now views.
+  - Enum arrays under the postgres-js profile are REAL arrays, not raw
+    literals. Measured: postgres.js fetches custom type parsers at
+    connect, so every normally opened connection parses enum arrays;
+    only a connection created before the enum type existed sees the raw
+    literal (documented limit). Schemas now emit arrays of enum labels.
+    The verify harness normalizes PGlite's raw literal under the named
+    enum-array-literal-vs-array delta.
+  - In multi-schema runs, export names now carry the schema prefix
+    (public_settingsRow), matching the existing file-name prefixing;
+    before, same-named tables produced ambiguous barrel star exports,
+    which ESM silently drops, so both schemas vanished without an error.
+    Emitters that import the zod files (rest, service, orpc, trpc, mcp,
+    ai-tools) now import by the prefixed file names, which were simply
+    broken before. Naming lives in core (exportBaseName, fileBaseName).
+  - Sanitized-name collisions inside one schema ("a b" and "a-b") now
+    fail generation loudly, naming both relations, instead of silently
+    dropping the exports.
+  - The Database bridge quotes non-identifier keys ("Order Log", "café"),
+    so exotic names no longer emit syntactically invalid TypeScript, and
+    overloaded functions merge into one key with union Args and Returns
+    instead of duplicate keys.
+
+### Patch Changes
+
+- e3a62a0: A second, harsher torture round (multi-level partitioning, foreign
+  tables, zero-column and 120-column tables, hostile identifiers, an
+  unpopulated materialized view, FK exotics) found and fixed another
+  batch:
+
+  - Zero-column tables were invisible (the snapshot was built from column
+    rows alone); foreign tables (FDW) were invisible too. Both now appear:
+    foreign tables carry the new kind "foreign" and every writable code
+    path treats them as read-only; the Database bridge lists them beside
+    plain tables and pgtap asserts them with has_foreign_table.
+  - An unpopulated materialized view or a failing foreign-table read
+    aborted the whole generate run mid-verification; both now verify as
+    skipped with a note.
+  - A column literally named **proto** silently corrupted every generated
+    schema (object literals set the prototype even for quoted keys) until
+    a validator crashed; generation now refuses it loudly. A table named
+    "index" silently lost its schema file to the barrel; that is now a
+    loud error too.
+  - Seed correctness: nullable foreign keys now order parents before
+    children (soft edges, broken only on real cycles with those cells
+    seeded null); FKs referencing a UNIQUE column instead of the primary
+    key are refused with a named reason; free-text placeholders are only
+    emitted for genuinely free-text base types (inet, cidr, interval and
+    friends have constrained input syntax) and respect varchar/char
+    length caps.
+  - Trigger-returning functions no longer leak into the Functions block;
+    dictionary cells escape pipes and newlines in comments; the schema
+    card keeps multiline comments on one line. SUPAWATCH_DEBUG=1 prints
+    stack traces on CLI errors.
+
+- Updated dependencies [c95d248]
+- Updated dependencies [e3a62a0]
+  - @supawatch/core@0.8.0
+
 ## 0.7.1
 
 ### Patch Changes
