@@ -1,6 +1,17 @@
 {
   "name": "@supawatch/target-zod",
   "version": "0.1.2",
+  "description": "Zod schemas generated from live Postgres by supawatch, mapped to what the driver actually returns.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "zod",
+    "validation"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {

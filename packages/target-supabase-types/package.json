@@ -1,6 +1,18 @@
 {
   "name": "@supawatch/target-supabase-types",
   "version": "0.1.2",
+  "description": "A supabase-js compatible Database interface generated from live Postgres by supawatch, foreign-key relationships included.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "supabase-js",
+    "database-types",
+    "gen-types"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {

@@ -224,5 +224,5 @@ pnpm run e2e     # Docker Postgres 17, pack-install-run consumer, live DDL
 pnpm run gate    # both
 ```
 
-Releases are changesets-driven; see [RELEASING.md](RELEASING.md).
-[MIT](LICENSE).
+Releases are changesets-driven: land changes with a changeset, and the
+release workflow versions, gates, and publishes. [MIT](LICENSE).

@@ -1,6 +1,18 @@
 {
   "name": "@supawatch/verify",
   "version": "0.1.2",
+  "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "pglite",
+    "testing",
+    "verification"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {
