@@ -1,0 +1,46 @@
+{
+  "name": "@supawatch/target-pgtap",
+  "version": "0.5.0",
+  "description": "A plan-counted pgTAP structural test suite generated from live Postgres by supawatch, RLS and policy assertions included.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "pgtap",
+    "testing",
+    "pg_prove",
+    "rls"
+  ],
+  "license": "MIT",
+  "author": "Omar Dulaimi",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/omar-dulaimi/supawatch.git",
+    "directory": "packages/target-pgtap"
+  },
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "@supawatch/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "typescript": "^5.9.0"
+  }
+}

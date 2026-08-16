@@ -11,6 +11,7 @@ export type {
   Import,
   Querier,
   Rendered,
+  RlsPolicy,
   RuntimeType,
   Snapshot,
   Table,
