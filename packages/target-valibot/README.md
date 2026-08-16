@@ -24,7 +24,7 @@ export const tasksRow = v.strictObject({
   "id": v.string(),
   "status": v.picklist(["todo", "doing", "done", "archived"]),
   "estimate_hours": v.nullable(v.string()),
-  "created_at": v.date(),
+  "created_at": v.instance(Date),
 });
 ```
 

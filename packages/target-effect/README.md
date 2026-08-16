@@ -16,7 +16,7 @@ targets: [{ kind: "effect", strict: true }]
 variants follow the same rules as the other validator targets.
 
 Verified, not assumed: the repo's parity harness runs the emitted Effect
-schemas as a fifth verdict beside Zod, Valibot, ArkType, and TypeBox
+schemas as one verdict beside every other validator target
 against rows from a real database, and any divergence must be recorded
 in a must-fire ledger before the suite passes.
 
