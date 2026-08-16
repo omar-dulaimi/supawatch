@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-forms",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Framework-agnostic form field configs generated from live Postgres by supawatch: controls, labels, requiredness, enum options.",
   "keywords": [
     "supabase",

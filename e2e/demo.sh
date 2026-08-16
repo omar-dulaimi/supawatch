@@ -43,14 +43,20 @@ echo "== 2b. Pack every package and install like a real consumer =="
 for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
-V=$(cd "$ROOT/packages/core" && node -p "require('./package.json').version")
+pv() { node -p "require('$ROOT/packages/$1/package.json').version"; }
+V=$(pv core)
+V_ERD=$(pv target-erd); V_LOCK=$(pv target-schema-lock); V_JS=$(pv target-json-schema)
+V_FC=$(pv target-fast-check); V_FORMS=$(pv target-forms); V_FACT=$(pv target-factories)
+V_TRPC=$(pv target-trpc); V_ZOD=$(pv target-zod); V_VALI=$(pv target-valibot)
+V_ARK=$(pv target-arktype); V_TB=$(pv target-typebox); V_ST=$(pv target-supabase-types)
+V_WATCH=$(pv watch); V_CLI=$(pv cli)
 cat > out-work/package.json <<PKG
 {
   "name": "e2e-consumer",
   "private": true,
   "type": "module",
   "dependencies": {
-    "supawatch": "file:../tars/supawatch-${V}.tgz",
+    "supawatch": "file:../tars/supawatch-${V_CLI}.tgz",
     "@sinclair/typebox": "^0.34.0",
     "fast-check": "^4.0.0",
     "@trpc/server": "^11.0.0",
@@ -60,19 +66,19 @@ cat > out-work/package.json <<PKG
   },
   "overrides": {
     "@supawatch/core": "file:../tars/supawatch-core-${V}.tgz",
-    "@supawatch/target-arktype": "file:../tars/supawatch-target-arktype-${V}.tgz",
-    "@supawatch/target-erd": "file:../tars/supawatch-target-erd-${V}.tgz",
-    "@supawatch/target-schema-lock": "file:../tars/supawatch-target-schema-lock-${V}.tgz",
-    "@supawatch/target-json-schema": "file:../tars/supawatch-target-json-schema-${V}.tgz",
-    "@supawatch/target-fast-check": "file:../tars/supawatch-target-fast-check-${V}.tgz",
-    "@supawatch/target-forms": "file:../tars/supawatch-target-forms-${V}.tgz",
-    "@supawatch/target-factories": "file:../tars/supawatch-target-factories-${V}.tgz",
-    "@supawatch/target-trpc": "file:../tars/supawatch-target-trpc-${V}.tgz",
-    "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V}.tgz",
-    "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V}.tgz",
-    "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V}.tgz",
-    "@supawatch/target-zod": "file:../tars/supawatch-target-zod-${V}.tgz",
-    "@supawatch/watch": "file:../tars/supawatch-watch-${V}.tgz"
+    "@supawatch/target-arktype": "file:../tars/supawatch-target-arktype-${V_ARK}.tgz",
+    "@supawatch/target-erd": "file:../tars/supawatch-target-erd-${V_ERD}.tgz",
+    "@supawatch/target-schema-lock": "file:../tars/supawatch-target-schema-lock-${V_LOCK}.tgz",
+    "@supawatch/target-json-schema": "file:../tars/supawatch-target-json-schema-${V_JS}.tgz",
+    "@supawatch/target-fast-check": "file:../tars/supawatch-target-fast-check-${V_FC}.tgz",
+    "@supawatch/target-forms": "file:../tars/supawatch-target-forms-${V_FORMS}.tgz",
+    "@supawatch/target-factories": "file:../tars/supawatch-target-factories-${V_FACT}.tgz",
+    "@supawatch/target-trpc": "file:../tars/supawatch-target-trpc-${V_TRPC}.tgz",
+    "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V_ST}.tgz",
+    "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V_TB}.tgz",
+    "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V_VALI}.tgz",
+    "@supawatch/target-zod": "file:../tars/supawatch-target-zod-${V_ZOD}.tgz",
+    "@supawatch/watch": "file:../tars/supawatch-watch-${V_WATCH}.tgz"
   }
 }
 PKG

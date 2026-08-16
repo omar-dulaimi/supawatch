@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-factories",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Typed fixture factories generated from live Postgres by supawatch, guaranteed to satisfy the generated Zod schemas.",
   "keywords": [
     "supabase",
