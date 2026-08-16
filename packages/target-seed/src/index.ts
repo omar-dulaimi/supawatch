@@ -167,11 +167,14 @@ export class SeedTarget implements Target<SeedTargetOptions> {
 
     const tables = snapshot.tables.filter((t) => t.kind === "table");
     const byName = new Map(tables.map((t) => [`${t.schema}.${t.name}`, t]));
-    // Domains can carry CHECK constraints the snapshot does not record,
-    // so a base-type literal is a guess that may not apply. Never guess:
-    // let the database fill nullable or defaulted domain columns, and
-    // skip tables that require one.
-    const domainNames = new Set(snapshot.domains.map((d) => d.name));
+    // A base-type literal for a constrained domain is a guess against a
+    // CHECK the snapshot does not parse. Never guess: let the database
+    // fill nullable or defaulted columns of constrained domains, and
+    // skip tables that require one. Unconstrained domains behave as
+    // their base type and seed normally.
+    const constrainedDomains = new Set(
+      snapshot.domains.filter((d) => d.hasConstraints).map((d) => d.name),
+    );
 
     // The literal a table's Nth row uses for its single-column primary
     // key. Children reuse this for their FK cells, so uuid and numeric
@@ -199,9 +202,10 @@ export class SeedTarget implements Target<SeedTargetOptions> {
       );
     }
 
+    // Pass 1: plan each table's insertable columns and its own skip
+    // reasons, without emitting yet.
+    const plans: { table: Table; cols: Column[]; skipReasons: string[] }[] = [];
     for (const table of ordered) {
-      const q = (s: string) => '"' + s.replace(/"/g, '""') + '"';
-      const ident = `${q(table.schema)}.${q(table.name)}`;
       const pk = table.primaryKey.length === 1 ? table.primaryKey[0] : null;
 
       const skipReasons: string[] = [];
@@ -218,15 +222,13 @@ export class SeedTarget implements Target<SeedTargetOptions> {
           }
           continue;
         }
-        if (domainNames.has(col.pgTypeName)) {
+        if (constrainedDomains.has(col.pgTypeName)) {
           if (col.name === pk) {
             skipReasons.push(
-              `primary key ${col.name} is a domain type (its constraints are not introspected)`,
+              `primary key ${col.name} has a constrained domain type`,
             );
           } else if (!col.nullable && !col.hasDefault) {
-            skipReasons.push(
-              `domain type on ${col.name} (its constraints are not introspected)`,
-            );
+            skipReasons.push(`constrained domain type on ${col.name}`);
           }
           continue;
         }
@@ -247,6 +249,45 @@ export class SeedTarget implements Target<SeedTargetOptions> {
         }
         cols.push(col);
       }
+      plans.push({ table, cols, skipReasons });
+    }
+
+    // A required single-column FK into a table that is not seeded (its
+    // own reasons, a cycle, or outside the snapshot) makes the child
+    // unseedable too; propagate to a fixpoint so seed.sql always
+    // applies.
+    const skipped = new Set(cyclic.map((t) => `${t.schema}.${t.name}`));
+    for (const p of plans) {
+      if (p.skipReasons.length > 0) skipped.add(`${p.table.schema}.${p.table.name}`);
+    }
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const p of plans) {
+        const key = `${p.table.schema}.${p.table.name}`;
+        if (skipped.has(key)) continue;
+        for (const fk of p.table.foreignKeys) {
+          if (f_multi(fk)) continue;
+          const col = p.table.columns.find((c) => fk.columns.includes(c.name));
+          if (!col || col.nullable || col.hasDefault) continue;
+          const parentKey = `${fk.referencedSchema}.${fk.referencedTable}`;
+          if (skipped.has(parentKey) || !byName.has(parentKey)) {
+            p.skipReasons.push(
+              `required foreign key ${col.name} references ${parentKey}, which is not seeded`,
+            );
+            skipped.add(key);
+            changed = true;
+            break;
+          }
+        }
+      }
+    }
+
+    // Pass 2: emit.
+    for (const { table, cols, skipReasons } of plans) {
+      const q = (s: string) => '"' + s.replace(/"/g, '""') + '"';
+      const ident = `${q(table.schema)}.${q(table.name)}`;
+      const pk = table.primaryKey.length === 1 ? table.primaryKey[0] : null;
 
       if (skipReasons.length > 0) {
         lines.push(

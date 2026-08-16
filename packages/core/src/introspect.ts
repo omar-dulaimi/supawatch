@@ -44,6 +44,7 @@ interface DomainRow {
   domain_schema: string;
   domain_name: string;
   base_type_name: string;
+  has_constraints: boolean;
 }
 
 interface CompositeRow {
@@ -92,14 +93,22 @@ export async function introspect(
 
   // Domains resolve through the recursive CTE below; a domain over a
   // domain lands on the ultimate base type.
+  // The constrained flag accumulates over the whole chain: a domain over
+  // a constrained domain is itself constrained for insert purposes.
   const domainRows = await query<DomainRow>(
     `with recursive chain as (
-       select t.oid, t.typname, n.nspname, t.typbasetype
+       select t.oid, t.typname, n.nspname, t.typbasetype,
+         (t.typnotnull or exists (
+           select 1 from pg_constraint x where x.contypid = t.oid
+         )) as constrained
        from pg_type t
        join pg_namespace n on n.oid = t.typnamespace
        where t.typtype = 'd' and n.nspname = any($1)
        union all
-       select c.oid, c.typname, c.nspname, bt.typbasetype
+       select c.oid, c.typname, c.nspname, bt.typbasetype,
+         (c.constrained or bt.typnotnull or exists (
+           select 1 from pg_constraint x where x.contypid = bt.oid
+         )) as constrained
        from chain c
        join pg_type bt on bt.oid = c.typbasetype
        where bt.typtype = 'd'
@@ -107,7 +116,8 @@ export async function introspect(
      select distinct on (c.oid)
        c.nspname as domain_schema,
        c.typname as domain_name,
-       bt.typname as base_type_name
+       bt.typname as base_type_name,
+       c.constrained as has_constraints
      from chain c
      join pg_type bt on bt.oid = c.typbasetype
      where bt.typtype <> 'd'
@@ -118,6 +128,7 @@ export async function introspect(
     schema: r.domain_schema,
     name: r.domain_name,
     baseTypeName: r.base_type_name,
+    hasConstraints: Boolean(r.has_constraints),
   }));
 
   // Standalone composites only: every table also has a rowtype with

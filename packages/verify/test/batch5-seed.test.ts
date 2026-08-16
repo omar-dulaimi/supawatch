@@ -138,33 +138,50 @@ describe("seed target against a real empty database", () => {
 
 describe("seed target never guesses at domain constraints", () => {
   // Found by the supawatch-minis dogfood: a base-type placeholder for a
-  // domain column violated the domain's CHECK and the whole seed.sql
-  // failed to apply. Domain constraints are not introspected, so the
-  // only honest moves are omit (nullable or defaulted) and skip
-  // (required).
-  it("omits nullable domain columns and skips tables requiring one", async () => {
+  // CHECKed domain column violated the CHECK and the whole seed.sql
+  // failed to apply. The snapshot records whether a domain chain carries
+  // constraints; when it does, the honest moves are omit (nullable or
+  // defaulted) and skip (required). Unconstrained domains seed as their
+  // base type.
+  it("omits nullable constrained-domain columns, skips tables requiring one, cascades to FK children, seeds unconstrained domains", async () => {
     const dom = new PGlite();
     await dom.exec(`
       create domain strict_email as text check (value like '%@%');
+      create domain loose_label as text;
       create table people (
         id serial primary key,
         name text not null,
+        nickname loose_label not null,
         contact strict_email
       );
       create table subscriptions (
         id serial primary key,
         billing_email strict_email not null
       );
+      create table invoices (
+        id serial primary key,
+        subscription_id integer not null references subscriptions(id)
+      );
     `);
     const snap = await introspect(querierFromPglite(dom));
+    expect(snap.domains.find((d) => d.name === "strict_email")?.hasConstraints).toBe(true);
+    expect(snap.domains.find((d) => d.name === "loose_label")?.hasConstraints).toBe(false);
+
     const sql = new SeedTarget().renderSnapshot(snap, { rows: 3 })[0].content;
 
+    // unconstrained domain seeds via its base type; constrained one is omitted
+    expect(sql).toContain("people nickname");
     expect(sql).not.toContain("people contact");
     expect(sql).toContain('insert into "public"."people"');
     expect(sql).toContain(
-      "-- skipped public.subscriptions: domain type on billing_email (its constraints are not introspected)",
+      "-- skipped public.subscriptions: constrained domain type on billing_email",
+    );
+    // the child of an unseeded parent is skipped too, never emitted broken
+    expect(sql).toContain(
+      "-- skipped public.invoices: required foreign key subscription_id references public.subscriptions, which is not seeded",
     );
     expect(sql).not.toContain('insert into "public"."subscriptions"');
+    expect(sql).not.toContain('insert into "public"."invoices"');
 
     // the proof that matters: the emitted file applies to the real db
     await dom.exec(sql);
