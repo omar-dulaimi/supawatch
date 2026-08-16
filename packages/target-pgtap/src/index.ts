@@ -34,11 +34,15 @@ export class PgtapTarget implements Target<PgtapTargetOptions> {
   }
 
   renderSnapshot(snapshot: Snapshot, _opts: PgtapTargetOptions): SnapshotFile[] {
-    const tables = snapshot.tables.filter((t) => t.kind === "table");
+    const tables = snapshot.tables.filter((t) => t.kind !== "view");
     const assertions: string[] = [];
 
     for (const t of tables) {
-      assertions.push(`select has_table(${lit(t.schema)}, ${lit(t.name)}, ${lit(`${t.name} exists`)});`);
+      assertions.push(
+        t.kind === "foreign"
+          ? `select has_foreign_table(${lit(t.schema)}, ${lit(t.name)}, ${lit(`${t.name} exists`)});`
+          : `select has_table(${lit(t.schema)}, ${lit(t.name)}, ${lit(`${t.name} exists`)});`,
+      );
       for (const col of t.columns) {
         assertions.push(
           `select has_column(${lit(t.schema)}, ${lit(t.name)}, ${lit(col.name)}, ${lit(`${t.name}.${col.name} exists`)});`,

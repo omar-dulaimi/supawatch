@@ -53,5 +53,8 @@ async function main() {
 
 main().catch((err) => {
   console.error(`[supawatch] ${err instanceof Error ? err.message : err}`);
+  if (process.env.SUPAWATCH_DEBUG && err instanceof Error && err.stack) {
+    console.error(err.stack);
+  }
   process.exit(1);
 });

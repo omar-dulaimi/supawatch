@@ -61,7 +61,9 @@ export interface Table {
   // Views are tables to a reader; the marker exists because Postgres
   // reports every view column as nullable regardless of the underlying
   // column, and consumers deserve to know that is why.
-  kind: "table" | "view";
+  // "foreign" marks foreign tables (FDW): readable relations that every
+  // writable code path treats as read-only.
+  kind: "table" | "view" | "foreign";
   comment?: string;
   columns: Column[];
 }

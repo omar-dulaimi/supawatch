@@ -136,6 +136,143 @@ describe("the Database bridge survives exotic identifiers and overloads", () => 
   });
 });
 
+describe("torture 2: hostile relations and seeds", () => {
+  it("zero-column tables and unpopulated matviews survive a full run", async () => {
+    const edge = new PGlite();
+    await edge.exec(`
+      create table nothing_here ();
+      create table things (id serial primary key, name text not null);
+      insert into things (name) values ('x');
+      create materialized view ghost as select name from things with no data;
+    `);
+    const q = querierFromPglite(edge);
+    const snap = await introspect(q);
+    expect(snap.tables.find((t) => t.name === "nothing_here")?.kind).toBe("table");
+    expect(snap.tables.find((t) => t.name === "ghost")?.kind).toBe("view");
+
+    const dir = await mkdtemp(path.join(path.dirname(fileURLToPath(import.meta.url)), "edge-"));
+    const logs: string[] = [];
+    try {
+      const watcher = new Watcher({
+        query: q,
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        log: (m: string) => logs.push(m),
+      });
+      await watcher.runOnce();
+      expect(logs.join("\n")).toContain("ghost: skipped (materialized view not populated)");
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await edge.close();
+    }
+  });
+
+  it("a column named __proto__ fails loudly instead of corrupting schemas", async () => {
+    const evil = new PGlite();
+    await evil.exec('create table t (id serial primary key, "__proto__" text)');
+    const dir = await mkdtemp(path.join(tmpdir(), "proto-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(evil),
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        verifyRows: false,
+        log: () => {},
+      });
+      await expect(watcher.runOnce()).rejects.toThrow(/__proto__/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await evil.close();
+    }
+  });
+
+  it("a table named index fails loudly instead of losing to the barrel", async () => {
+    const clash = new PGlite();
+    await clash.exec('create table "index" (id serial primary key)');
+    const dir = await mkdtemp(path.join(tmpdir(), "idxclash-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(clash),
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        verifyRows: false,
+        log: () => {},
+      });
+      await expect(watcher.runOnce()).rejects.toThrow(/barrel's own file name/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await clash.close();
+    }
+  });
+
+  it("seed honors soft FK order, refuses non-pk references and constrained text types, caps char lengths", async () => {
+    const { SeedTarget } = await import("@supawatch/target-seed");
+    const dbb = new PGlite();
+    await dbb.exec(`
+      create table zz_parents (id serial primary key, label text not null);
+      create table aa_children (
+        id serial primary key,
+        parent_id int references zz_parents(id)
+      );
+      create table registry (id serial primary key, email text not null unique);
+      create table subs (id serial primary key, target_email text not null references registry(email));
+      create table nets (id serial primary key, ip inet not null, tag varchar(4) not null);
+    `);
+    const snap = await introspect(querierFromPglite(dbb));
+    const sql = new SeedTarget().renderSnapshot(snap, { rows: 2 })[0].content;
+
+    // nullable FK still orders parent first (soft edge, honored)
+    expect(sql.indexOf('"zz_parents"')).toBeLessThan(sql.indexOf('"aa_children"'));
+    // FK to a unique non-pk column is refused with the reason
+    expect(sql).toContain(
+      "-- skipped public.subs: foreign key target_email references registry(email), not its primary key",
+    );
+    // inet is string-at-runtime but not free text; required means skip
+    expect(sql).toContain("no honest value for ip (inet)");
+    // varchar(4) placeholder respects the declared cap
+    const tag = /"tag"\) values \(\d+, '([^']*)'/.exec(sql)?.[1];
+    expect(tag).toBeUndefined(); // nets skipped entirely for ip
+
+    // the file must apply to the real database
+    await dbb.exec(sql);
+    const q = querierFromPglite(dbb);
+    const [{ n }] = await q<{ n: unknown }>("select count(*)::int as n from aa_children");
+    expect(Number(n)).toBe(2);
+    await dbb.close();
+  });
+
+  it("caps free-text placeholders to declared char lengths", async () => {
+    const { SeedTarget } = await import("@supawatch/target-seed");
+    const dbc = new PGlite();
+    await dbc.exec("create table caps (id serial primary key, tag varchar(4) not null, fixed char(3) not null)");
+    const snap = await introspect(querierFromPglite(dbc));
+    const sql = new SeedTarget().renderSnapshot(snap, { rows: 1 })[0].content;
+    await dbc.exec(sql);
+    const q = querierFromPglite(dbc);
+    const [row] = await q<{ tag: string; fixed: string }>("select tag, fixed from caps");
+    expect(row.tag.length).toBeLessThanOrEqual(4);
+    expect(row.fixed.length).toBeLessThanOrEqual(3);
+    await dbc.close();
+  });
+
+  it("excludes trigger-returning functions from the snapshot", async () => {
+    const dbf = new PGlite();
+    await dbf.exec(`
+      create table t (id int);
+      create function normal_fn(x int) returns int language sql as 'select x';
+      create function trg_fn() returns trigger language plpgsql as $$ begin return new; end $$;
+    `);
+    const snap = await introspect(querierFromPglite(dbf));
+    const names = snap.functions.map((f) => f.name);
+    expect(names).toContain("normal_fn");
+    expect(names).not.toContain("trg_fn");
+    await dbf.close();
+  });
+});
+
 describe("multi-schema watcher run stays coherent end to end", () => {
   it("emits prefixed files whose barrel re-exports prefixed names", async () => {
     // inside the repo so the generated module's zod import resolves

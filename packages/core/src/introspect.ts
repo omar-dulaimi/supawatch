@@ -68,8 +68,9 @@ export async function introspect(
   const includeViews = opts.includeViews !== false;
   const profile = opts.profile ?? "postgres-js";
   // 'r' plain tables, 'p' partitioned parents (their internal partitions
-  // are excluded below), 'v' views, 'm' materialized views.
-  const relkinds = includeViews ? ["r", "p", "v", "m"] : ["r", "p"];
+  // are excluded below), 'f' foreign tables, 'v' views, 'm' materialized
+  // views.
+  const relkinds = includeViews ? ["r", "p", "f", "v", "m"] : ["r", "p", "f"];
 
   const enumRows = await query<EnumRow>(
     `select n.nspname as enum_schema, t.typname as enum_name, e.enumlabel as label
@@ -258,6 +259,7 @@ export async function introspect(
      join pg_type rt on rt.oid = p.prorettype
      where n.nspname = any($1)
        and p.prokind = 'f'
+       and rt.typname <> 'trigger'
        and not exists (
          select 1 from pg_depend d
          where d.objid = p.oid and d.deptype = 'e'
@@ -393,7 +395,53 @@ export async function introspect(
     fksByTable.set(key, list);
   }
 
+  const kindOfRel = (relkind: string): Table["kind"] =>
+    relkind === "v" || relkind === "m"
+      ? "view"
+      : relkind === "f"
+        ? "foreign"
+        : "table";
+
   const tables = new Map<string, Table>();
+
+  // Zero-column relations exist (create table t()); the column loop
+  // below never sees them, so seed the map from pg_class first.
+  const relRows = await query<{
+    table_schema: string;
+    table_name: string;
+    rel_kind: string;
+    rls_enabled: boolean;
+    table_comment: string | null;
+  }>(
+    `select
+       n.nspname as table_schema,
+       c.relname as table_name,
+       c.relkind::text as rel_kind,
+       c.relrowsecurity as rls_enabled,
+       obj_description(c.oid, 'pg_class') as table_comment
+     from pg_class c
+     join pg_namespace n on n.oid = c.relnamespace
+     where n.nspname = any($1)
+       and c.relkind = any($2)
+       and not c.relispartition
+     order by c.relname`,
+    [schemas, relkinds],
+  );
+  for (const r of relRows) {
+    const key = `${r.table_schema}.${r.table_name}`;
+    tables.set(key, {
+      schema: r.table_schema,
+      name: r.table_name,
+      kind: kindOfRel(r.rel_kind),
+      rlsEnabled: r.rls_enabled === true,
+      policies: policiesByTable.get(key) ?? [],
+      ...(r.table_comment ? { comment: r.table_comment } : {}),
+      primaryKey: pkByTable.get(key) ?? [],
+      foreignKeys: fksByTable.get(key) ?? [],
+      columns: [],
+    });
+  }
+
   for (const r of columnRows) {
     const key = `${r.table_schema}.${r.table_name}`;
     let table = tables.get(key);
@@ -401,7 +449,7 @@ export async function introspect(
       table = {
         schema: r.table_schema,
         name: r.table_name,
-        kind: r.rel_kind === "v" || r.rel_kind === "m" ? "view" : "table",
+        kind: kindOfRel(r.rel_kind),
         rlsEnabled: r.rls_enabled === true,
         policies: policiesByTable.get(key) ?? [],
         ...(r.table_comment ? { comment: r.table_comment } : {}),

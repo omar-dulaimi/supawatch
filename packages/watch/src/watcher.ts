@@ -161,6 +161,17 @@ export class Watcher {
       // instead.
       const exportOwners = new Map<string, string>();
       for (const table of next.tables) {
+        // A column literally named __proto__ cannot be carried by a
+        // JavaScript object literal: even as a quoted string key it sets
+        // the object's prototype instead of a property, silently
+        // corrupting every generated schema for the table. Refuse.
+        if (table.columns.some((c) => c.name === "__proto__")) {
+          throw new Error(
+            `table ${table.schema}.${table.name} has a column named "__proto__"; ` +
+              `JavaScript object literals cannot represent that name safely, so generated ` +
+              `schemas would be silently corrupted. Rename the column.`,
+          );
+        }
         const rendered = run.target.renderTable(table, next, run.options);
         const tableKey = `${table.schema}.${table.name}`;
         const owner = exportOwners.get(rendered.exportName);
@@ -209,6 +220,17 @@ export class Watcher {
       // re-exports the same entries, which TS resolves to their .d.mts.
       const keepTypes = new Set(next.tables.map((t) => `${fileBase(t)}.d.mts`));
       if (this.opts.barrel !== false && run.target.barrel !== false) {
+        // A table named "index" writes index.mjs, the barrel's own file;
+        // the barrel would silently replace the table's schema. Refuse.
+        const clash = next.tables.find(
+          (t) => fileBase(t) === "index",
+        );
+        if (clash) {
+          throw new Error(
+            `table ${clash.schema}.${clash.name} emits index${run.target.fileExtension}, which is the barrel's own file name; ` +
+              `rename the table, set barrel: false, or give the target its own path.`,
+          );
+        }
         const lines = next.tables
           .map((t) => `export * from "./${fileBase(t)}${run.target.fileExtension}";`)
           .sort()
@@ -240,14 +262,34 @@ export class Watcher {
 
   private async verifyTable(
     run: TargetRun,
-    table: { schema: string; name: string },
+    table: { schema: string; name: string; kind?: string },
     file: string,
     exportName: string,
   ) {
     const verifier = run.target.verifier!();
     const schema = await verifier.load(file, exportName);
     const ident = `"${table.schema.replace(/"/g, '""')}"."${table.name.replace(/"/g, '""')}"`;
-    const rows = await this.opts.query(`select * from ${ident} limit 10`);
+    let rows: Record<string, unknown>[];
+    try {
+      rows = await this.opts.query(`select * from ${ident} limit 10`);
+    } catch (err) {
+      // An unpopulated materialized view (created WITH NO DATA, not yet
+      // refreshed) errors on any read. That is a deploy-order fact, not
+      // a schema-truth failure; verify nothing rather than abort the
+      // whole run.
+      if (String(err).includes("has not been populated")) {
+        this.log(`ground-truth check, ${table.name}: skipped (materialized view not populated)`);
+        return { table: table.name, rows: 0, passed: 0, reasons: [] };
+      }
+      // A foreign table reads from somewhere else entirely; a dead FDW
+      // server or malformed source file is that source's problem, not a
+      // schema-truth failure.
+      if (table.kind === "foreign") {
+        this.log(`ground-truth check, ${table.name}: skipped (foreign table read failed)`);
+        return { table: table.name, rows: 0, passed: 0, reasons: [] };
+      }
+      throw err;
+    }
     let passed = 0;
     const reasons: string[] = [];
     for (const row of rows) {
