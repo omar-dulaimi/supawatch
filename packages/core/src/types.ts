@@ -76,6 +76,10 @@ export interface DomainType {
   schema: string;
   name: string;
   baseTypeName: string;
+  // True when the domain, or any domain in its base chain, carries a
+  // CHECK constraint or NOT NULL: a base-type value is then not
+  // guaranteed to be accepted.
+  hasConstraints: boolean;
 }
 
 export interface CompositeField {
