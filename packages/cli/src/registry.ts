@@ -122,6 +122,21 @@ export const TARGETS: readonly TargetEntry[] = [
     outputDir: (t, cfg) => t.path ?? cfg.outDir,
   },
   {
+    kind: "mcp",
+    specifier: "@supawatch/target-mcp",
+    load: () => import("@supawatch/target-mcp"),
+    construct: (m) => new (m as { McpTarget: new () => Target }).McpTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
+    kind: "ai-tools",
+    specifier: "@supawatch/target-ai-tools",
+    load: () => import("@supawatch/target-ai-tools"),
+    construct: (m) =>
+      new (m as { AiToolsTarget: new () => Target }).AiToolsTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
     kind: "supabase-types",
     specifier: "@supawatch/target-supabase-types",
     load: () => import("@supawatch/target-supabase-types"),

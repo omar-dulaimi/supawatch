@@ -78,6 +78,14 @@ META = {
         "description": "Typed supabase-js realtime payload aliases generated from live Postgres by supawatch, shaped by the measured wire profile.",
         "keywords": BASE_KEYWORDS + ["realtime", "supabase-js", "payloads"],
     },
+    "target-mcp": {
+        "description": "A generated MCP server per database from supawatch: list and get tools per table, validated by the generated Zod schemas.",
+        "keywords": BASE_KEYWORDS + ["mcp", "model-context-protocol", "ai", "agents"],
+    },
+    "target-ai-tools": {
+        "description": "Vercel AI SDK tool definitions generated from live Postgres by supawatch, validated by the generated Zod schemas.",
+        "keywords": BASE_KEYWORDS + ["ai-sdk", "vercel-ai", "tools", "agents"],
+    },
     "verify": {
         "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
         "keywords": BASE_KEYWORDS + ["pglite", "testing", "verification"],

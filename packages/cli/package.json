@@ -44,6 +44,7 @@
   },
   "dependencies": {
     "@supawatch/core": "workspace:*",
+    "@supawatch/target-ai-tools": "workspace:*",
     "@supawatch/target-arktype": "workspace:*",
     "@supawatch/target-dictionary": "workspace:*",
     "@supawatch/target-erd": "workspace:*",
@@ -51,6 +52,7 @@
     "@supawatch/target-fast-check": "workspace:*",
     "@supawatch/target-forms": "workspace:*",
     "@supawatch/target-json-schema": "workspace:*",
+    "@supawatch/target-mcp": "workspace:*",
     "@supawatch/target-realtime": "workspace:*",
     "@supawatch/target-schema-card": "workspace:*",
     "@supawatch/target-schema-lock": "workspace:*",

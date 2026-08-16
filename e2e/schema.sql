@@ -25,6 +25,9 @@ create table orders (
   placed_at timestamptz not null default now()
 );
 
+create function order_total_sum() returns numeric language sql stable
+  as 'select coalesce(sum(total), 0) from orders';
+
 create view paid_orders as
   select id, user_id, total from orders where status = 'paid';
 
