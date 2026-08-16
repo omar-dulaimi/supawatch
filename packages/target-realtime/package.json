@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-realtime",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Typed supabase-js realtime payload aliases generated from live Postgres by supawatch, shaped by the measured wire profile.",
   "keywords": [
     "supabase",

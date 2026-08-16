@@ -1,5 +1,52 @@
 # supawatch
 
+## 0.6.0
+
+### Minor Changes
+
+- 0fbe207: Eight new targets: effect (Effect Schema structs, verified as a fifth
+  parity verdict), rest (Hono route modules), service (typed repositories
+  over postgres.js), orpc (oRPC routers), graphql (an executable Pothos
+  schema), pgtap (a plan-counted structural test suite), rls (policy
+  skeletons for exactly the tables that need attention), and pgmq (typed
+  queue clients per detected queue).
+
+  Core grows an RLS facet: tables now carry `rlsEnabled` and their
+  `pg_policies` rows, and the watcher diff reports RLS enables, disables,
+  policy creates, and policy drops as they happen.
+
+### Patch Changes
+
+- Updated dependencies [0fbe207]
+  - @supawatch/core@0.6.0
+  - @supawatch/target-effect@0.6.0
+  - @supawatch/target-rest@0.6.0
+  - @supawatch/target-service@0.6.0
+  - @supawatch/target-orpc@0.6.0
+  - @supawatch/target-graphql@0.6.0
+  - @supawatch/target-pgtap@0.6.0
+  - @supawatch/target-rls@0.6.0
+  - @supawatch/target-pgmq@0.6.0
+  - @supawatch/target-ai-tools@0.6.0
+  - @supawatch/target-arktype@0.6.0
+  - @supawatch/target-dictionary@0.6.0
+  - @supawatch/target-erd@0.6.0
+  - @supawatch/target-factories@0.6.0
+  - @supawatch/target-fast-check@0.6.0
+  - @supawatch/target-forms@0.6.0
+  - @supawatch/target-json-schema@0.6.0
+  - @supawatch/target-mcp@0.6.0
+  - @supawatch/target-realtime@0.6.0
+  - @supawatch/target-schema-card@0.6.0
+  - @supawatch/target-schema-lock@0.6.0
+  - @supawatch/target-seed@0.6.0
+  - @supawatch/target-supabase-types@0.6.0
+  - @supawatch/target-trpc@0.6.0
+  - @supawatch/target-typebox@0.6.0
+  - @supawatch/target-valibot@0.6.0
+  - @supawatch/target-zod@0.6.0
+  - @supawatch/watch@0.6.0
+
 ## 0.5.0
 
 ### Minor Changes
