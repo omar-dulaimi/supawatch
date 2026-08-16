@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-typebox",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "TypeBox schemas generated from live Postgres by supawatch, mapped to what the driver actually returns.",
   "keywords": [
     "supabase",
