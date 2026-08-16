@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/verify",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
   "keywords": [
     "supabase",
