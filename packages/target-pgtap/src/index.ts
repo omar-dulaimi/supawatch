@@ -62,10 +62,11 @@ export class PgtapTarget implements Target<PgtapTargetOptions> {
         );
       }
       if (t.rlsEnabled) {
-        // Supabase's test helpers ship tests.rls_enabled; plain pgtap
-        // projects can swap this for a results_eq over pg_class.
+        // Core pgtap ships no rls_enabled (that is a Supabase test-helpers
+        // function), so assert straight off pg_class: the suite then runs
+        // under plain pg_prove and supabase test db alike.
         assertions.push(
-          `select tests.rls_enabled(${lit(t.schema)}, ${lit(t.name)});`,
+          `select ok((select relrowsecurity from pg_class c join pg_namespace n on n.oid = c.relnamespace where n.nspname = ${lit(t.schema)} and c.relname = ${lit(t.name)}), ${lit(`rls enabled on ${t.schema}.${t.name}`)});`,
         );
         for (const p of t.policies) {
           assertions.push(
