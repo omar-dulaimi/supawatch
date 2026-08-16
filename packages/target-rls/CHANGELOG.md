@@ -1,5 +1,12 @@
 # @supawatch/target-rls
 
+## 0.7.0
+
+### Patch Changes
+
+- Updated dependencies [9314a4a]
+  - @supawatch/core@0.7.0
+
 ## 0.6.0
 
 ### Minor Changes
