@@ -13,6 +13,9 @@ export const TARGET_KINDS = [
   "schema-lock",
   "json-schema",
   "fast-check",
+  "forms",
+  "factories",
+  "trpc",
 ] as const;
 
 function targetConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
@@ -45,6 +48,9 @@ const TargetConfig = z.discriminatedUnion("kind", [
   targetConfigFor("typebox"),
   targetConfigFor("json-schema"),
   targetConfigFor("fast-check"),
+  targetConfigFor("forms"),
+  targetConfigFor("factories"),
+  targetConfigFor("trpc").extend({ schemasImportPath: z.string().optional() }),
   SupabaseTypesConfig,
   snapshotConfigFor("erd"),
   snapshotConfigFor("schema-lock"),

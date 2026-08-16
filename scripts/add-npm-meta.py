@@ -54,6 +54,18 @@ META = {
         "description": "fast-check arbitraries generated from live Postgres by supawatch, producing rows shaped like real driver output.",
         "keywords": BASE_KEYWORDS + ["fast-check", "property-testing", "fuzzing", "testing"],
     },
+    "target-forms": {
+        "description": "Framework-agnostic form field configs generated from live Postgres by supawatch: controls, labels, requiredness, enum options.",
+        "keywords": BASE_KEYWORDS + ["forms", "react-hook-form", "tanstack-form"],
+    },
+    "target-factories": {
+        "description": "Typed fixture factories generated from live Postgres by supawatch, guaranteed to satisfy the generated Zod schemas.",
+        "keywords": BASE_KEYWORDS + ["fixtures", "factories", "testing"],
+    },
+    "target-trpc": {
+        "description": "tRPC routers generated from live Postgres by supawatch, input-validated by the generated Zod schemas.",
+        "keywords": BASE_KEYWORDS + ["trpc", "router", "api"],
+    },
     "verify": {
         "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
         "keywords": BASE_KEYWORDS + ["pglite", "testing", "verification"],
