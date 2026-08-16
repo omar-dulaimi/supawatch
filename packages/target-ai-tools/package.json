@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-ai-tools",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Vercel AI SDK tool definitions generated from live Postgres by supawatch, validated by the generated Zod schemas.",
   "keywords": [
     "supabase",
