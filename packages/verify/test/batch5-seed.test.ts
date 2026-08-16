@@ -135,3 +135,42 @@ describe("seed target against a real empty database", () => {
     expect(again).toBe(seedSql);
   });
 });
+
+describe("seed target never guesses at domain constraints", () => {
+  // Found by the supawatch-minis dogfood: a base-type placeholder for a
+  // domain column violated the domain's CHECK and the whole seed.sql
+  // failed to apply. Domain constraints are not introspected, so the
+  // only honest moves are omit (nullable or defaulted) and skip
+  // (required).
+  it("omits nullable domain columns and skips tables requiring one", async () => {
+    const dom = new PGlite();
+    await dom.exec(`
+      create domain strict_email as text check (value like '%@%');
+      create table people (
+        id serial primary key,
+        name text not null,
+        contact strict_email
+      );
+      create table subscriptions (
+        id serial primary key,
+        billing_email strict_email not null
+      );
+    `);
+    const snap = await introspect(querierFromPglite(dom));
+    const sql = new SeedTarget().renderSnapshot(snap, { rows: 3 })[0].content;
+
+    expect(sql).not.toContain("people contact");
+    expect(sql).toContain('insert into "public"."people"');
+    expect(sql).toContain(
+      "-- skipped public.subscriptions: domain type on billing_email (its constraints are not introspected)",
+    );
+    expect(sql).not.toContain('insert into "public"."subscriptions"');
+
+    // the proof that matters: the emitted file applies to the real db
+    await dom.exec(sql);
+    const query = querierFromPglite(dom);
+    const rows = await query<{ n: unknown }>("select count(*) as n from people");
+    expect(Number(rows[0].n)).toBe(3);
+    await dom.close();
+  });
+});

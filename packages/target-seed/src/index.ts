@@ -167,6 +167,11 @@ export class SeedTarget implements Target<SeedTargetOptions> {
 
     const tables = snapshot.tables.filter((t) => t.kind === "table");
     const byName = new Map(tables.map((t) => [`${t.schema}.${t.name}`, t]));
+    // Domains can carry CHECK constraints the snapshot does not record,
+    // so a base-type literal is a guess that may not apply. Never guess:
+    // let the database fill nullable or defaulted domain columns, and
+    // skip tables that require one.
+    const domainNames = new Set(snapshot.domains.map((d) => d.name));
 
     // The literal a table's Nth row uses for its single-column primary
     // key. Children reuse this for their FK cells, so uuid and numeric
@@ -210,6 +215,18 @@ export class SeedTarget implements Target<SeedTargetOptions> {
         if (fk && f_multi(fk)) {
           if (!col.nullable && !col.hasDefault) {
             skipReasons.push(`multi-column foreign key on ${col.name}`);
+          }
+          continue;
+        }
+        if (domainNames.has(col.pgTypeName)) {
+          if (col.name === pk) {
+            skipReasons.push(
+              `primary key ${col.name} is a domain type (its constraints are not introspected)`,
+            );
+          } else if (!col.nullable && !col.hasDefault) {
+            skipReasons.push(
+              `domain type on ${col.name} (its constraints are not introspected)`,
+            );
           }
           continue;
         }
