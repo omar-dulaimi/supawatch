@@ -1,5 +1,40 @@
 # supawatch
 
+## 0.5.0
+
+### Minor Changes
+
+- e508d5f: The seed target: deterministic, FK-aware seed.sql. Topologically ordered
+  inserts, explicit identity ids via OVERRIDING SYSTEM VALUE, sequence
+  resync with setval, real enum labels, byte-stable output, and honest
+  skip comments for cycles, multi-column foreign keys, and unliteralable
+  required columns. Proven against a real empty database, with seeded rows
+  ground-truth checked by the generated Zod schemas.
+
+### Patch Changes
+
+- Updated dependencies [e508d5f]
+  - @supawatch/target-seed@0.5.0
+  - @supawatch/core@0.5.0
+  - @supawatch/target-ai-tools@0.5.0
+  - @supawatch/target-arktype@0.5.0
+  - @supawatch/target-dictionary@0.5.0
+  - @supawatch/target-erd@0.5.0
+  - @supawatch/target-factories@0.5.0
+  - @supawatch/target-fast-check@0.5.0
+  - @supawatch/target-forms@0.5.0
+  - @supawatch/target-json-schema@0.5.0
+  - @supawatch/target-mcp@0.5.0
+  - @supawatch/target-realtime@0.5.0
+  - @supawatch/target-schema-card@0.5.0
+  - @supawatch/target-schema-lock@0.5.0
+  - @supawatch/target-supabase-types@0.5.0
+  - @supawatch/target-trpc@0.5.0
+  - @supawatch/target-typebox@0.5.0
+  - @supawatch/target-valibot@0.5.0
+  - @supawatch/target-zod@0.5.0
+  - @supawatch/watch@0.5.0
+
 ## 0.4.0
 
 ### Minor Changes
