@@ -28,6 +28,9 @@ jobs:
           cache: pnpm
           registry-url: https://registry.npmjs.org
 
+      # OIDC trusted publishing needs npm 11.5+; Node 22 bundles npm 10.
+      - run: npm install -g npm@11
+
       - run: pnpm install --frozen-lockfile
 
       # The gate lives INSIDE the release job on purpose: the changesets
