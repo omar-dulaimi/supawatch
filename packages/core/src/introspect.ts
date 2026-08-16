@@ -5,6 +5,7 @@ import type {
   DomainType,
   EnumType,
   ForeignKey,
+  FunctionInfo,
   Querier,
   Snapshot,
   Table,
@@ -209,6 +210,65 @@ export async function introspect(
     [schemas, relkinds],
   );
 
+  // Plain functions only (prokind 'f'): no procedures, aggregates or
+  // window functions, and none owned by extensions. IN and INOUT args
+  // in call order; pronargdefaults counts trailing defaulted args.
+  const fnRows = await query<{
+    fn_schema: string;
+    fn_name: string;
+    arg_names: string[] | null;
+    arg_types: string[];
+    n_defaults: number;
+    ret_type: string;
+    ret_kind: string;
+    ret_set: boolean;
+  }>(
+    `select
+       n.nspname as fn_schema,
+       p.proname as fn_name,
+       p.proargnames as arg_names,
+       coalesce(
+         (select array_agg(t.typname order by ord.n)
+          from unnest(p.proargtypes) with ordinality as ord(oid, n)
+          join pg_type t on t.oid = ord.oid),
+         '{}'
+       ) as arg_types,
+       p.pronargdefaults as n_defaults,
+       rt.typname as ret_type,
+       rt.typtype::text as ret_kind,
+       p.proretset as ret_set
+     from pg_proc p
+     join pg_namespace n on n.oid = p.pronamespace
+     join pg_type rt on rt.oid = p.prorettype
+     where n.nspname = any($1)
+       and p.prokind = 'f'
+       and not exists (
+         select 1 from pg_depend d
+         where d.objid = p.oid and d.deptype = 'e'
+       )
+     order by p.proname`,
+    [schemas],
+  );
+  const functions: FunctionInfo[] = fnRows.map((r) => {
+    const argCount = r.arg_types.length;
+    const firstDefault = argCount - r.n_defaults;
+    return {
+      schema: r.fn_schema,
+      name: r.fn_name,
+      args: r.arg_types.map((typeName, idx) => ({
+        name: r.arg_names?.[idx] ?? `arg${idx + 1}`,
+        pgTypeName: typeName,
+        runtime: runtimeFor(typeName, "b", { enums: enumList }, profile),
+        hasDefault: idx >= firstDefault,
+      })),
+      returns: {
+        pgTypeName: r.ret_type,
+        runtime: runtimeFor(r.ret_type, r.ret_kind, { enums: enumList }, profile),
+        isSet: r.ret_set,
+      },
+    };
+  });
+
   const pkRows = await query<{
     table_schema: string;
     table_name: string;
@@ -341,5 +401,5 @@ export async function introspect(
     table.columns.push(col);
   }
 
-  return { tables: [...tables.values()], enums: enumList, domains, composites };
+  return { tables: [...tables.values()], enums: enumList, domains, composites, functions };
 }

@@ -5,6 +5,8 @@ export type {
   DomainType,
   EnumType,
   ForeignKey,
+  FunctionArg,
+  FunctionInfo,
   SnapshotFile,
   Import,
   Querier,

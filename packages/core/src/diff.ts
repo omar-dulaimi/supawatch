@@ -51,6 +51,17 @@ export function diff(prev: Snapshot, next: Snapshot): string[] {
     if (!nextDomains.has(k)) changes.push(`domain ${k} dropped`);
   }
 
+  const fnKey = (f: { schema: string; name: string; args: { pgTypeName: string }[] }) =>
+    `${f.schema}.${f.name}(${f.args.map((a) => a.pgTypeName).join(",")})`;
+  const prevFns = new Map(prev.functions.map((f) => [fnKey(f), f]));
+  const nextFns = new Map(next.functions.map((f) => [fnKey(f), f]));
+  for (const [k] of nextFns) {
+    if (!prevFns.has(k)) changes.push(`function ${k} created`);
+  }
+  for (const [k] of prevFns) {
+    if (!nextFns.has(k)) changes.push(`function ${k} dropped`);
+  }
+
   const prevComposites = new Map(prev.composites.map((c) => [`${c.schema}.${c.name}`, c]));
   const nextComposites = new Map(next.composites.map((c) => [`${c.schema}.${c.name}`, c]));
   for (const [k, comp] of nextComposites) {

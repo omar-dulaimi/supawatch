@@ -40,11 +40,12 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc target-schema-card target-dictionary target-realtime watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc target-schema-card target-dictionary target-realtime target-mcp target-ai-tools watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 pv() { node -p "require('$ROOT/packages/$1/package.json').version"; }
 V_CARD=$(pv target-schema-card); V_DICT=$(pv target-dictionary); V_RT=$(pv target-realtime)
+V_MCP=$(pv target-mcp); V_AI=$(pv target-ai-tools)
 V=$(pv core)
 V_ERD=$(pv target-erd); V_LOCK=$(pv target-schema-lock); V_JS=$(pv target-json-schema)
 V_FC=$(pv target-fast-check); V_FORMS=$(pv target-forms); V_FACT=$(pv target-factories)
@@ -62,6 +63,8 @@ cat > out-work/package.json <<PKG
     "fast-check": "^4.0.0",
     "@trpc/server": "^11.0.0",
     "@supabase/supabase-js": "^2.45.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "ai": "^5.0.0",
     "typescript": "^5.9.0",
     "arktype": "^2.1.0",
     "valibot": "^1.1.0",
@@ -80,6 +83,8 @@ cat > out-work/package.json <<PKG
     "@supawatch/target-schema-card": "file:../tars/supawatch-target-schema-card-${V_CARD}.tgz",
     "@supawatch/target-dictionary": "file:../tars/supawatch-target-dictionary-${V_DICT}.tgz",
     "@supawatch/target-realtime": "file:../tars/supawatch-target-realtime-${V_RT}.tgz",
+    "@supawatch/target-mcp": "file:../tars/supawatch-target-mcp-${V_MCP}.tgz",
+    "@supawatch/target-ai-tools": "file:../tars/supawatch-target-ai-tools-${V_AI}.tgz",
     "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V_ST}.tgz",
     "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V_TB}.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V_VALI}.tgz",
@@ -122,6 +127,9 @@ export default defineConfig({
     { kind: "schema-card" },
     { kind: "dictionary" },
     { kind: "realtime" },
+    { kind: "mcp" },
+    { kind: "ai-tools" },
+    { kind: "supabase-types", path: "$OUT" },
   ],
 });
 CFG
@@ -260,6 +268,36 @@ const handle = (c: OrdersChanges) => {
 void handle;
 RT
 (cd out-work && npx tsc --noEmit --strict --skipLibCheck --target es2022 --module nodenext --moduleResolution nodenext realtime-check.ts) || fail "realtime types do not typecheck against supabase-js"
+
+echo "== 9e. batch-4 target assertions =="
+[ -f "$OUT/mcp-server.mjs" ] || fail "mcp server missing"
+[ -f "$OUT/ai-tools.mjs" ] || fail "ai tools missing"
+[ -f "$OUT/database.types.ts" ] || fail "bridge missing"
+awk 'index($0, "order_total_sum: {") { f = 1 } END { exit !f }' "$OUT/database.types.ts" || fail "bridge Functions block missing"
+(cd out-work && node -e "
+Promise.all([import('$OUT/mcp-server.mjs'), import('@modelcontextprotocol/sdk/client/index.js'), import('@modelcontextprotocol/sdk/inMemory.js'), import('postgres')]).then(async ([m, c, t, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const server = m.createMcpServer({ sql });
+  const [ct, st] = t.InMemoryTransport.createLinkedPair();
+  const client = new c.Client({ name: 'e2e', version: '0.0.1' });
+  await Promise.all([server.connect(st), client.connect(ct)]);
+  const tools = await client.listTools();
+  if (!tools.tools.some((x) => x.name === 'orders_list')) { console.error('no orders_list'); process.exit(1); }
+  const res = await client.callTool({ name: 'orders_list', arguments: { limit: 5 } });
+  const rows = JSON.parse(res.content[0].text);
+  if (!rows.length || typeof rows[0].total !== 'string') { console.error('mcp rows wrong'); process.exit(1); }
+  console.log('mcp live: ' + tools.tools.length + ' tools, orders_list ' + rows.length + ' rows');
+  await client.close(); await server.close(); await sql.end();
+})") || fail "mcp round trip failed"
+(cd out-work && node -e "
+Promise.all([import('$OUT/ai-tools.mjs'), import('postgres')]).then(async ([m, pg]) => {
+  const sql = pg.default(process.env.DATABASE_URL, { max: 1 });
+  const tools = m.createAiTools({ sql });
+  const rows = await tools.orders_list.execute({ limit: 3 });
+  if (!rows.length) { console.error('ai tools empty'); process.exit(1); }
+  console.log('ai-tools live: orders_list ' + rows.length + ' rows');
+  await sql.end();
+})") || fail "ai tools execute failed"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

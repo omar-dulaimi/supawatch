@@ -77,11 +77,26 @@ export interface CompositeTypeInfo {
   fields: CompositeField[];
 }
 
+export interface FunctionArg {
+  name: string;
+  pgTypeName: string;
+  runtime: RuntimeType;
+  hasDefault: boolean;
+}
+
+export interface FunctionInfo {
+  schema: string;
+  name: string;
+  args: FunctionArg[];
+  returns: { pgTypeName: string; runtime: RuntimeType; isSet: boolean };
+}
+
 export interface Snapshot {
   tables: Table[];
   enums: EnumType[];
   domains: DomainType[];
   composites: CompositeTypeInfo[];
+  functions: FunctionInfo[];
 }
 
 // Minimal query seam so core never depends on a specific driver. postgres.js
