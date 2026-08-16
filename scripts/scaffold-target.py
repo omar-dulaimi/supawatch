@@ -12,7 +12,7 @@ pkg = root / "packages" / name
 
 manifest = {
     "name": f"@supawatch/{name}",
-    "version": "0.1.3",
+    "version": json.loads((root / "packages" / "core" / "package.json").read_text())["version"],
     "license": "MIT",
     "author": "Omar Dulaimi",
     "repository": {
