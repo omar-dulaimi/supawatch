@@ -1,5 +1,12 @@
 # @supawatch/target-trpc
 
+## 0.9.0
+
+### Patch Changes
+
+- Updated dependencies [99797c6]
+  - @supawatch/core@0.9.0
+
 ## 0.8.0
 
 ### Patch Changes
