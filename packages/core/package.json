@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/core",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Snapshot IR, catalog introspection, diffing, and the measured runtime-type map behind supawatch.",
   "keywords": [
     "supabase",
