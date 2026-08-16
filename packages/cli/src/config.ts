@@ -21,6 +21,7 @@ export const TARGET_KINDS = [
   "realtime",
   "mcp",
   "ai-tools",
+  "seed",
 ] as const;
 
 function targetConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
@@ -64,6 +65,7 @@ const TargetConfig = z.discriminatedUnion("kind", [
   snapshotConfigFor("realtime"),
   snapshotConfigFor("mcp").extend({ schemasImportPath: z.string().optional() }),
   snapshotConfigFor("ai-tools").extend({ schemasImportPath: z.string().optional() }),
+  snapshotConfigFor("seed").extend({ rows: z.number().int().positive().max(1000).optional() }),
 ]);
 
 const SourceConfig = z

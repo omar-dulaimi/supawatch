@@ -1,6 +1,19 @@
 {
   "name": "@supawatch/target-seed",
   "version": "0.3.0",
+  "description": "Deterministic FK-aware seed.sql generated from live Postgres by supawatch: topological order, identity overriding, sequence resync.",
+  "keywords": [
+    "supabase",
+    "postgres",
+    "postgresql",
+    "codegen",
+    "schema",
+    "typescript",
+    "seed",
+    "fixtures",
+    "seed-sql",
+    "supabase-seed"
+  ],
   "license": "MIT",
   "author": "Omar Dulaimi",
   "repository": {
