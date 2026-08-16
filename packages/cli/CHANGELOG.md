@@ -1,5 +1,20 @@
 # supawatch
 
+## 0.1.3
+
+### Patch Changes
+
+- e650db3: Proper npm pages: every package now ships a focused README, a
+  description, and keywords. No code changes.
+- Updated dependencies [e650db3]
+  - @supawatch/core@0.1.3
+  - @supawatch/target-zod@0.1.3
+  - @supawatch/target-valibot@0.1.3
+  - @supawatch/target-arktype@0.1.3
+  - @supawatch/target-typebox@0.1.3
+  - @supawatch/target-supabase-types@0.1.3
+  - @supawatch/watch@0.1.3
+
 ## 0.1.2
 
 ### Patch Changes
