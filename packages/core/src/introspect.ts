@@ -28,6 +28,8 @@ interface ColumnRow {
   has_default: boolean;
   identity_kind: string;
   is_generated: boolean;
+  column_comment: string | null;
+  table_comment: string | null;
 }
 
 interface EnumRow {
@@ -188,7 +190,9 @@ export async function introspect(
        not a.attnotnull as is_nullable,
        a.atthasdef as has_default,
        a.attidentity::text as identity_kind,
-       (a.attgenerated <> '') as is_generated
+       (a.attgenerated <> '') as is_generated,
+       col_description(c.oid, a.attnum) as column_comment,
+       obj_description(c.oid, 'pg_class') as table_comment
      from pg_class c
      join pg_namespace n on n.oid = c.relnamespace
      join pg_attribute a on a.attrelid = c.oid
@@ -283,6 +287,7 @@ export async function introspect(
         schema: r.table_schema,
         name: r.table_name,
         kind: r.rel_kind === "v" ? "view" : "table",
+        ...(r.table_comment ? { comment: r.table_comment } : {}),
         primaryKey: pkByTable.get(key) ?? [],
         foreignKeys: fksByTable.get(key) ?? [],
         columns: [],
@@ -293,6 +298,7 @@ export async function introspect(
     // behaves exactly as its base type at the driver level. Array
     // columns resolve their element the same way.
     let runtime;
+    let elementEnumRef: string | undefined;
     if (r.is_array && r.element_type_name) {
       const element = runtimeFor(
         r.element_type_name,
@@ -300,6 +306,7 @@ export async function introspect(
         { enums: enumList },
         profile,
       );
+      if (element.kind === "enum") elementEnumRef = r.element_type_name;
       runtime = arrayRuntimeFor(element, r.declared_dims, profile);
     } else {
       runtime = runtimeFor(
@@ -323,8 +330,14 @@ export async function introspect(
             ? "default"
             : null,
       generated: r.is_generated,
+      ...(r.column_comment ? { comment: r.column_comment } : {}),
     };
     if (runtime.kind === "enum") col.enumRef = r.effective_type_name;
+    // Enum arrays keep a reference to their element enum even when the
+    // postgres-js profile collapses them to a raw-literal string, so
+    // wire-profile targets (realtime, the Database bridge) can recover
+    // the real labels.
+    if (elementEnumRef) col.enumRef = elementEnumRef;
     table.columns.push(col);
   }
 

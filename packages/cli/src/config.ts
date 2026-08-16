@@ -16,6 +16,9 @@ export const TARGET_KINDS = [
   "forms",
   "factories",
   "trpc",
+  "schema-card",
+  "dictionary",
+  "realtime",
 ] as const;
 
 function targetConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
@@ -54,6 +57,9 @@ const TargetConfig = z.discriminatedUnion("kind", [
   SupabaseTypesConfig,
   snapshotConfigFor("erd"),
   snapshotConfigFor("schema-lock"),
+  snapshotConfigFor("schema-card"),
+  snapshotConfigFor("dictionary"),
+  snapshotConfigFor("realtime"),
 ]);
 
 const SourceConfig = z

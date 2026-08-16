@@ -40,10 +40,11 @@ echo "== 2b. Pack every package and install like a real consumer =="
 # The consumer installs tarballs, not workspace links: this is the
 # pack-install-run gate, catching files/exports defects a green working
 # tree hides. Overrides point the scoped deps at their sibling tarballs.
-for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc watch cli; do
+for pkg in core target-zod target-valibot target-arktype target-typebox target-supabase-types target-erd target-schema-lock target-json-schema target-fast-check target-forms target-factories target-trpc target-schema-card target-dictionary target-realtime watch cli; do
   (cd "$ROOT/packages/$pkg" && pnpm pack --pack-destination "$ROOT/e2e/tars" >/dev/null)
 done
 pv() { node -p "require('$ROOT/packages/$1/package.json').version"; }
+V_CARD=$(pv target-schema-card); V_DICT=$(pv target-dictionary); V_RT=$(pv target-realtime)
 V=$(pv core)
 V_ERD=$(pv target-erd); V_LOCK=$(pv target-schema-lock); V_JS=$(pv target-json-schema)
 V_FC=$(pv target-fast-check); V_FORMS=$(pv target-forms); V_FACT=$(pv target-factories)
@@ -60,6 +61,8 @@ cat > out-work/package.json <<PKG
     "@sinclair/typebox": "^0.34.0",
     "fast-check": "^4.0.0",
     "@trpc/server": "^11.0.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "typescript": "^5.9.0",
     "arktype": "^2.1.0",
     "valibot": "^1.1.0",
     "zod": "^4.0.0"
@@ -74,6 +77,9 @@ cat > out-work/package.json <<PKG
     "@supawatch/target-forms": "file:../tars/supawatch-target-forms-${V_FORMS}.tgz",
     "@supawatch/target-factories": "file:../tars/supawatch-target-factories-${V_FACT}.tgz",
     "@supawatch/target-trpc": "file:../tars/supawatch-target-trpc-${V_TRPC}.tgz",
+    "@supawatch/target-schema-card": "file:../tars/supawatch-target-schema-card-${V_CARD}.tgz",
+    "@supawatch/target-dictionary": "file:../tars/supawatch-target-dictionary-${V_DICT}.tgz",
+    "@supawatch/target-realtime": "file:../tars/supawatch-target-realtime-${V_RT}.tgz",
     "@supawatch/target-supabase-types": "file:../tars/supawatch-target-supabase-types-${V_ST}.tgz",
     "@supawatch/target-typebox": "file:../tars/supawatch-target-typebox-${V_TB}.tgz",
     "@supawatch/target-valibot": "file:../tars/supawatch-target-valibot-${V_VALI}.tgz",
@@ -113,6 +119,9 @@ export default defineConfig({
     { kind: "forms" },
     { kind: "factories" },
     { kind: "trpc" },
+    { kind: "schema-card" },
+    { kind: "dictionary" },
+    { kind: "realtime" },
   ],
 });
 CFG
@@ -137,6 +146,11 @@ $PSQL -c "alter type order_status add value 'refunded';" >/dev/null
 $PSQL -c 'create table refunds (id serial primary key, order_id integer not null, amount numeric(10,2) not null);' >/dev/null
 $PSQL -c "insert into refunds (order_id, amount) values (1, '49.90');" >/dev/null
 wait_for_log "table public.refunds created" 15
+sleep 1
+
+echo "== 7a2. Live DDL: a comment lands =="
+$PSQL -c "comment on column orders.total is 'Gross amount, tax included.';" >/dev/null
+wait_for_log "comment on public.orders.total changed" 15
 sleep 1
 
 echo "== 7b. Live DDL: a view appears =="
@@ -226,6 +240,26 @@ Promise.all([import('$OUT/trpc/orders.mjs'), import('@trpc/server'), import('pos
   console.log('trpc live: list ' + rows.length + ', byId ok, create ok');
   await sql.end();
 })") || fail "trpc router failed against live db"
+
+echo "== 9d. batch-3 target assertions =="
+[ -f "$OUT/schema-card.md" ] || fail "schema card missing"
+awk 'index($0, "- orders") { f = 1 } END { exit !f }' "$OUT/schema-card.md" || fail "card lacks orders"
+[ -f "$OUT/schema-dictionary.md" ] || fail "dictionary missing"
+awk 'index($0, "Gross amount, tax included.") { f = 1 } END { exit !f }' "$OUT/schema-dictionary.md" || fail "live comment absent from dictionary"
+[ -f "$OUT/realtime.types.ts" ] || fail "realtime types missing"
+awk 'index($0, "OrdersChanges = RealtimePostgresChangesPayload<OrdersWireRow>") { f = 1 } END { exit !f }' "$OUT/realtime.types.ts" || fail "realtime alias missing"
+awk 'index($0, "\"total\": number;") { f = 1 } END { exit !f }' "$OUT/realtime.types.ts" || fail "realtime wire profile wrong for numeric"
+cat > out-work/realtime-check.ts <<RT
+import type { OrdersChanges } from "./generated/realtime.types.js";
+const handle = (c: OrdersChanges) => {
+  if (c.eventType === "INSERT") {
+    const total: number = c.new.total;
+    void total;
+  }
+};
+void handle;
+RT
+(cd out-work && npx tsc --noEmit --strict --skipLibCheck --target es2022 --module nodenext --moduleResolution nodenext realtime-check.ts) || fail "realtime types do not typecheck against supabase-js"
 
 echo "== 10. check: clean tree passes, tampering fails =="
 (cd out-work && "$CLI" check) || fail "check reported drift on a clean tree"

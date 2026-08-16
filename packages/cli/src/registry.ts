@@ -98,6 +98,30 @@ export const TARGETS: readonly TargetEntry[] = [
     outputDir: (t, cfg) => t.path ?? path.join(cfg.outDir, "trpc"),
   },
   {
+    kind: "schema-card",
+    specifier: "@supawatch/target-schema-card",
+    load: () => import("@supawatch/target-schema-card"),
+    construct: (m) =>
+      new (m as { SchemaCardTarget: new () => Target }).SchemaCardTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
+    kind: "dictionary",
+    specifier: "@supawatch/target-dictionary",
+    load: () => import("@supawatch/target-dictionary"),
+    construct: (m) =>
+      new (m as { DictionaryTarget: new () => Target }).DictionaryTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
+    kind: "realtime",
+    specifier: "@supawatch/target-realtime",
+    load: () => import("@supawatch/target-realtime"),
+    construct: (m) =>
+      new (m as { RealtimeTarget: new () => Target }).RealtimeTarget(),
+    outputDir: (t, cfg) => t.path ?? cfg.outDir,
+  },
+  {
     kind: "supabase-types",
     specifier: "@supawatch/target-supabase-types",
     load: () => import("@supawatch/target-supabase-types"),

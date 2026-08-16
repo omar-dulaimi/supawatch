@@ -118,6 +118,18 @@ export class Watcher {
     const files: string[] = [];
     const verified: CycleResult["verified"] = [];
 
+    // Prunes are aggregated per directory and extension across ALL
+    // targets, then executed once. Per-target pruning deleted sibling
+    // targets' files when several shared an outDir, which the e2e
+    // caught when schema-card's .md prune ate the ERD.
+    const pruneJobs = new Map<string, Set<string>>();
+    const notePrune = (dir: string, extension: string, keep: Iterable<string>) => {
+      const key = `${dir}\u0000${extension}`;
+      const set = pruneJobs.get(key) ?? new Set<string>();
+      for (const k of keep) set.add(k);
+      pruneJobs.set(key, set);
+    };
+
     // With one schema, files keep bare table names. With several, every
     // file is prefixed with its schema, because two schemas can hold
     // same-named tables and the last write would silently win otherwise.
@@ -137,7 +149,7 @@ export class Watcher {
           keepSnap.add(f.file);
           files.push(file);
         }
-        await this.sink.prune(run.outDir, keepSnap, run.target.fileExtension);
+        notePrune(run.outDir, run.target.fileExtension, keepSnap);
         continue;
       }
       const keep = new Set<string>();
@@ -196,8 +208,13 @@ export class Watcher {
           files.push(indexTypes);
         }
       }
-      await this.sink.prune(run.outDir, keep, run.target.fileExtension);
-      await this.sink.prune(run.outDir, keepTypes, ".d.mts");
+      notePrune(run.outDir, run.target.fileExtension, keep);
+      notePrune(run.outDir, ".d.mts", keepTypes);
+    }
+
+    for (const [key, keep] of pruneJobs) {
+      const [dir, extension] = key.split("\u0000");
+      await this.sink.prune(dir, keep, extension);
     }
 
     this.last = next;
