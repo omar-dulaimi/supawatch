@@ -253,10 +253,13 @@ describe("pgtap target", () => {
     expect(file.content).toContain("select plan(");
     expect(file.content).toContain("select has_table('public', 'parcels'");
     expect(file.content).toContain("col_is_pk('public', 'parcels'");
-    expect(file.content).toContain("tests.rls_enabled('public', 'parcels');");
+    expect(file.content).toContain("'rls enabled on public.parcels'");
+    expect(file.content).toContain("select relrowsecurity from pg_class");
+    // portable: core pgtap only, no Supabase test-helpers functions
+    expect(file.content).not.toContain("tests.");
     expect(file.content).toContain("policies_are('public', 'parcels', array['parcels_read']");
     const planned = Number(/select plan\((\d+)\);/.exec(file.content)?.[1]);
-    const statements = (file.content.match(/^select (has_|col_|tests\.|policies_)/gm) ?? []).length;
+    const statements = (file.content.match(/^select (has_|col_|ok\(|policies_)/gm) ?? []).length;
     expect(planned).toBe(statements);
   });
 });

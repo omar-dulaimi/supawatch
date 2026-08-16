@@ -38,11 +38,20 @@ function shortType(runtime: RuntimeType): string {
   }
 }
 
+// Both date and timestamptz arrive as Date at runtime, but an LLM
+// reading "date" plans calendar arithmetic; keep the SQL granularity.
+function compactTemporal(sqlType: string): string {
+  if (sqlType === "timestamp with time zone") return "timestamptz";
+  if (sqlType === "timestamp without time zone") return "timestamp";
+  return sqlType;
+}
+
 function columnToken(table: Table, col: Column): string {
   const fk = table.foreignKeys.find((f) => f.columns.includes(col.name));
   const parts: string[] = [col.name];
   if (table.primaryKey.includes(col.name)) parts.push("PK");
   if (fk) parts.push(`-> ${fk.referencedTable}.${fk.referencedColumns[0]}`);
+  else if (col.runtime.kind === "date") parts.push(compactTemporal(col.sqlType));
   else parts.push(shortType(col.runtime));
   if (col.nullable) parts.push("null?");
   return parts.join(" ");
