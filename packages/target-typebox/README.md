@@ -18,15 +18,22 @@ npm install @sinclair/typebox   # peer dependency, resolved from your project
 Emitted shape:
 
 ```js
-import { Type } from "@sinclair/typebox";
+import { Type, TypeRegistry, Kind } from "@sinclair/typebox";
+
+if (!TypeRegistry.Has("PgDate")) TypeRegistry.Set("PgDate", (_s, v) => v instanceof Date);
 
 export const tasksRow = Type.Object({
   "id": Type.String(),
   "status": Type.Union([Type.Literal("todo"), Type.Literal("doing"), Type.Literal("done"), Type.Literal("archived")]),
   "estimate_hours": Type.Union([Type.String(), Type.Null()]),
-  "created_at": Type.Date(),
+  "created_at": Type.Unsafe({ [Kind]: "PgDate" }),
 }, { additionalProperties: false });
 ```
+
+Dates and floats validate through registered kinds (`PgDate`, `PgFloat`)
+because the stock checks reject real driver output: `timestamp
+'infinity'` arrives as an invalid `Date` instance, and float columns can
+hold `NaN` and the infinities.
 
 `strict` (default) sets `additionalProperties: false`. `uuid` columns stay
 plain `Type.String()` on purpose: format validation would need a

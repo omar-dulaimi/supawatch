@@ -18,9 +18,12 @@ with a nullable edge, and a post-seed insert that does not collide
 because sequences were resynced. Seeded rows are ground-truth checked
 against the generated Zod schemas.
 
-Honest limits, emitted as comments rather than guesses: tables whose
-required foreign keys form a cycle, multi-column foreign keys, and
-required columns with no default whose types have no honest literal
-(composites, unknown types) are skipped by name.
+Honest limits, emitted as comments rather than guesses: anything the
+generator cannot fill truthfully is skipped by name rather than
+approximated. That covers required foreign keys that form a cycle or
+reference something other than a predictable single-column primary key,
+multi-column foreign keys, constrained domains, and required columns
+whose types have no honest literal (composites, unknown types, string
+types with constrained input syntax like inet or interval).
 
 MIT.

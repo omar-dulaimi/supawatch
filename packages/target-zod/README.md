@@ -23,7 +23,7 @@ export const tasksRow = z.strictObject({
   "id": z.string(),
   "status": z.enum(["todo", "doing", "done", "archived"]),
   "estimate_hours": z.string().nullable(),
-  "created_at": z.date(),
+  "created_at": z.instanceof(Date),
 });
 ```
 
