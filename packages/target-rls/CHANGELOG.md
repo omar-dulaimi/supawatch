@@ -1,5 +1,11 @@
 # @supawatch/target-rls
 
+## 0.7.1
+
+### Patch Changes
+
+- @supawatch/core@0.7.1
+
 ## 0.7.0
 
 ### Patch Changes
