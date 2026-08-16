@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-mcp",
-  "version": "0.7.1",
+  "version": "0.8.0",
   "description": "A generated MCP server per database from supawatch: list and get tools per table, validated by the generated Zod schemas.",
   "keywords": [
     "supabase",
