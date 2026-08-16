@@ -3,11 +3,19 @@
 [![npm](https://img.shields.io/npm/v/supawatch)](https://www.npmjs.com/package/supawatch)
 [![ci](https://github.com/omar-dulaimi/supawatch/actions/workflows/ci.yml/badge.svg)](https://github.com/omar-dulaimi/supawatch/actions/workflows/ci.yml)
 
-Validator schemas and types generated from your live Postgres, kept in sync by
-the database itself. A DDL event trigger rings `pg_notify` on any schema
-change, a watcher regenerates Zod, Valibot, ArkType, or TypeBox schemas plus a
-supabase-js `Database` type, and every schema is verified against real rows
-before you trust it. No manual generate step to forget.
+Your Postgres schema, compiled to everything. A DDL event trigger rings
+`pg_notify` on any schema change, a watcher re-runs sixteen generation
+targets, and everything runnable is verified against real rows before you
+trust it. No manual generate step to forget.
+
+What it generates today: Zod, Valibot, ArkType and TypeBox validators with
+insert/update variants; a supabase-js `Database` type with relationships
+and functions; JSON Schemas with an Ajv verifier; fast-check arbitraries;
+typed fixture factories; tRPC routers; form field configs; a generated MCP
+server and Vercel AI SDK tools; typed realtime payloads; deterministic
+FK-aware seed data; a Mermaid ER diagram; a data dictionary; an LLM schema
+card; and a committed schema lockfile that turns pull-request diffs into
+schema changelogs.
 
 Built Supabase-first, works on any Postgres.
 
@@ -123,7 +131,20 @@ export default defineConfig({
     { kind: "valibot" },
     { kind: "arktype" },
     { kind: "typebox" },
-    { kind: "supabase-types" },  // emits database.types.ts for supabase-js
+    { kind: "json-schema" },     // draft-07, Ajv-verified
+    { kind: "supabase-types" },  // database.types.ts for supabase-js
+    { kind: "fast-check" },      // property-test arbitraries
+    { kind: "factories" },       // typed fixture factories
+    { kind: "forms" },           // field configs for form libraries
+    { kind: "trpc" },            // routers wired to the zod schemas
+    { kind: "mcp" },             // a generated MCP server
+    { kind: "ai-tools" },        // Vercel AI SDK tools
+    { kind: "realtime" },        // typed realtime payloads
+    { kind: "seed", rows: 3 },   // deterministic FK-aware seed.sql
+    { kind: "erd" },             // Mermaid ER diagram
+    { kind: "dictionary" },      // markdown data dictionary
+    { kind: "schema-card" },     // token-lean LLM context card
+    { kind: "schema-lock" },     // committed canonical snapshot
   ],
 });
 ```
@@ -202,12 +223,24 @@ out of `schemas` unless you deliberately want them.
 | [`supawatch`](https://www.npmjs.com/package/supawatch) | The CLI and config. Start here. |
 | [`@supawatch/core`](https://www.npmjs.com/package/@supawatch/core) | Snapshot IR, introspection, diff, runtime-type map. |
 | [`@supawatch/watch`](https://www.npmjs.com/package/@supawatch/watch) | The watcher runtime and trigger sources, usable as a library. |
-| [`@supawatch/target-zod`](https://www.npmjs.com/package/@supawatch/target-zod) | Zod target. |
-| [`@supawatch/target-valibot`](https://www.npmjs.com/package/@supawatch/target-valibot) | Valibot target. |
-| [`@supawatch/target-arktype`](https://www.npmjs.com/package/@supawatch/target-arktype) | ArkType target. |
-| [`@supawatch/target-typebox`](https://www.npmjs.com/package/@supawatch/target-typebox) | TypeBox target. |
-| [`@supawatch/target-supabase-types`](https://www.npmjs.com/package/@supawatch/target-supabase-types) | The supabase-js `Database` interface target. |
 | [`@supawatch/verify`](https://www.npmjs.com/package/@supawatch/verify) | The ground-truth and parity harness. |
+| `@supawatch/target-zod` \| `-valibot` \| `-arktype` \| `-typebox` | Validator targets with insert/update variants. |
+| `@supawatch/target-json-schema` | Draft-07 JSON Schemas, Ajv-verified. |
+| `@supawatch/target-supabase-types` | The supabase-js `Database` interface: relationships and functions included. |
+| `@supawatch/target-fast-check` | Property-test arbitraries guaranteed to satisfy the Zod schemas. |
+| `@supawatch/target-factories` | Typed fixture factories with the same guarantee. |
+| `@supawatch/target-forms` | Framework-agnostic form field configs. |
+| `@supawatch/target-trpc` | tRPC routers wired to the generated schemas. |
+| `@supawatch/target-mcp` | A generated MCP server, list and get tools per table. |
+| `@supawatch/target-ai-tools` | Vercel AI SDK tool definitions. |
+| `@supawatch/target-realtime` | Typed realtime payload aliases under the measured wire profile. |
+| `@supawatch/target-seed` | Deterministic FK-aware seed.sql with sequence resync. |
+| `@supawatch/target-erd` | A GitHub-rendered Mermaid ER diagram. |
+| `@supawatch/target-dictionary` | A markdown data dictionary, comments sourced from Postgres. |
+| `@supawatch/target-schema-card` | A token-lean schema card for LLM prompts. |
+| `@supawatch/target-schema-lock` | The committed canonical snapshot behind drift review. |
+
+Every `@supawatch/target-*` npm page carries its own focused README.
 
 ## Status
 
