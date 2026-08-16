@@ -1,6 +1,6 @@
 {
   "name": "supawatch",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "Validator schemas and types generated from your live Postgres, kept in sync by the database itself.",
   "keywords": [
     "supabase",

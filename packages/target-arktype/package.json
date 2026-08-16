@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-arktype",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "description": "ArkType types generated from live Postgres by supawatch, mapped to what the driver actually returns.",
   "keywords": [
     "supabase",
