@@ -145,7 +145,10 @@ export class Watcher {
         const rendered = run.target.renderTable(table, next, run.options);
         const base = `${fileBase(table)}${run.target.fileExtension}`;
         const file = path.join(run.outDir, base);
-        await this.sink.write(file, assemble(rendered));
+        const content = run.target.assembleFile
+          ? run.target.assembleFile(rendered)
+          : assemble(rendered);
+        await this.sink.write(file, content);
         keep.add(base);
         files.push(file);
 
@@ -176,7 +179,7 @@ export class Watcher {
       // strict TS), so the declaration barrel ships beside it and
       // re-exports the same entries, which TS resolves to their .d.mts.
       const keepTypes = new Set(next.tables.map((t) => `${fileBase(t)}.d.mts`));
-      if (this.opts.barrel !== false) {
+      if (this.opts.barrel !== false && run.target.barrel !== false) {
         const lines = next.tables
           .map((t) => `export * from "./${fileBase(t)}${run.target.fileExtension}";`)
           .sort()

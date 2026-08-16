@@ -205,6 +205,30 @@ export async function introspect(
     [schemas, relkinds],
   );
 
+  const pkRows = await query<{
+    table_schema: string;
+    table_name: string;
+    columns: string[];
+  }>(
+    `select
+       n.nspname as table_schema,
+       c.relname as table_name,
+       array_agg(a.attname order by ord.n) as columns
+     from pg_constraint con
+     join pg_class c on c.oid = con.conrelid
+     join pg_namespace n on n.oid = c.relnamespace
+     join lateral unnest(con.conkey) with ordinality as ord(attnum, n) on true
+     join pg_attribute a on a.attrelid = c.oid and a.attnum = ord.attnum
+     where con.contype = 'p' and n.nspname = any($1)
+     group by n.nspname, c.relname
+     order by c.relname`,
+    [schemas],
+  );
+  const pkByTable = new Map<string, string[]>();
+  for (const r of pkRows) {
+    pkByTable.set(`${r.table_schema}.${r.table_name}`, r.columns);
+  }
+
   const fkRows = await query<{
     table_schema: string;
     table_name: string;
@@ -259,6 +283,7 @@ export async function introspect(
         schema: r.table_schema,
         name: r.table_name,
         kind: r.rel_kind === "v" ? "view" : "table",
+        primaryKey: pkByTable.get(key) ?? [],
         foreignKeys: fksByTable.get(key) ?? [],
         columns: [],
       };

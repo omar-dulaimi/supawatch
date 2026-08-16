@@ -38,6 +38,22 @@ META = {
         "description": "A supabase-js compatible Database interface generated from live Postgres by supawatch, foreign-key relationships included.",
         "keywords": BASE_KEYWORDS + ["supabase-js", "database-types", "gen-types"],
     },
+    "target-erd": {
+        "description": "A Mermaid ER diagram generated from live Postgres by supawatch, kept current on every schema change.",
+        "keywords": BASE_KEYWORDS + ["mermaid", "erd", "diagram", "documentation"],
+    },
+    "target-schema-lock": {
+        "description": "A canonical committed schema lockfile from supawatch, turning pull-request diffs into schema changelogs.",
+        "keywords": BASE_KEYWORDS + ["lockfile", "drift", "ci"],
+    },
+    "target-json-schema": {
+        "description": "Draft-07 JSON Schemas generated from live Postgres by supawatch, Ajv-verified against real rows.",
+        "keywords": BASE_KEYWORDS + ["json-schema", "ajv", "validation", "openapi"],
+    },
+    "target-fast-check": {
+        "description": "fast-check arbitraries generated from live Postgres by supawatch, producing rows shaped like real driver output.",
+        "keywords": BASE_KEYWORDS + ["fast-check", "property-testing", "fuzzing", "testing"],
+    },
     "verify": {
         "description": "The supawatch verification harness: ground truth against real rows, cross-target parity, and a must-fire divergence ledger.",
         "keywords": BASE_KEYWORDS + ["pglite", "testing", "verification"],

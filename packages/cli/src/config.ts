@@ -3,7 +3,17 @@ import { z } from "zod";
 
 // One kind enum feeds the config parser and --only. A discriminated union
 // per kind from day one, the direct fix for drzl's flat 27-kind object.
-export const TARGET_KINDS = ["zod", "valibot", "arktype", "typebox", "supabase-types"] as const;
+export const TARGET_KINDS = [
+  "zod",
+  "valibot",
+  "arktype",
+  "typebox",
+  "supabase-types",
+  "erd",
+  "schema-lock",
+  "json-schema",
+  "fast-check",
+] as const;
 
 function targetConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
   return z.object({
@@ -24,12 +34,20 @@ const SupabaseTypesConfig = z.object({
   path: z.string().optional(),
 });
 
+function snapshotConfigFor<K extends (typeof TARGET_KINDS)[number]>(kind: K) {
+  return z.object({ kind: z.literal(kind), path: z.string().optional() });
+}
+
 const TargetConfig = z.discriminatedUnion("kind", [
   targetConfigFor("zod"),
   targetConfigFor("valibot"),
   targetConfigFor("arktype"),
   targetConfigFor("typebox"),
+  targetConfigFor("json-schema"),
+  targetConfigFor("fast-check"),
   SupabaseTypesConfig,
+  snapshotConfigFor("erd"),
+  snapshotConfigFor("schema-lock"),
 ]);
 
 const SourceConfig = z
