@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-schema-card",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "A compact, token-lean schema card generated from live Postgres by supawatch for LLM prompts and agent context.",
   "keywords": [
     "supabase",
