@@ -39,6 +39,7 @@ function tsType(runtime: RuntimeType, snapshot: Snapshot): string {
       return el.includes("|") ? `(${el})[]` : `${el}[]`;
     }
     case "enum":
+      if (runtime.labels.length === 0) return "never";
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
 }

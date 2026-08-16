@@ -39,6 +39,7 @@ function tsType(runtime: RuntimeType, jsonRef: string): string {
       return el.includes("|") ? `(${el})[]` : `${el}[]`;
     }
     case "enum":
+      if (runtime.labels.length === 0) return "never";
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
 }
@@ -234,7 +235,7 @@ export class SupabaseTypesTarget implements Target<SupabaseTypesOptions> {
       lines.push("    Enums: {");
       for (const e of enums) {
         lines.push(
-          `      ${tsKey(e.name)}: ${e.labels.map((l) => JSON.stringify(l)).join(" | ")};`,
+          `      ${tsKey(e.name)}: ${e.labels.length === 0 ? "never" : e.labels.map((l) => JSON.stringify(l)).join(" | ")};`,
         );
       }
       lines.push("    };");

@@ -87,7 +87,7 @@ describe("ZodTarget.renderTable", () => {
     expect(rendered.exportName).toBe("ordersRow");
     expect(rendered.imports).toEqual([{ from: "zod", names: ["z"] }]);
     expect(rendered.body).toContain('"total": z.string()');
-    expect(rendered.body).toContain('"placed_at": z.date()');
+    expect(rendered.body).toContain('"placed_at": z.instanceof(Date)');
     expect(rendered.body).toContain('"status": z.enum(["pending", "paid"])');
     expect(rendered.body).toContain('"note": z.string().nullable()');
     expect(rendered.body).toContain("z.strictObject({");

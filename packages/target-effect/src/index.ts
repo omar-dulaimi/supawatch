@@ -46,6 +46,7 @@ function effectExpr(runtime: RuntimeType): string {
     case "array":
       return `Schema.Array(${effectExpr(runtime.element)})`;
     case "enum": {
+      if (runtime.labels.length === 0) return "Schema.Never";
       const literals = runtime.labels
         .map((l) => `Schema.Literal(${JSON.stringify(l)})`)
         .join(", ");

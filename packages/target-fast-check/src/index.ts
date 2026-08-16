@@ -48,6 +48,10 @@ function arbExpr(runtime: RuntimeType): string {
     case "array":
       return `fc.array(${arbExpr(runtime.element)}, { maxLength: 5 })`;
     case "enum": {
+      // Zero-label enums exist; fc.constantFrom() with no arguments
+      // throws at load. Only null can inhabit such a column (the watcher
+      // refuses required ones).
+      if (runtime.labels.length === 0) return "fc.constant(null)";
       const labels = runtime.labels.map((l) => JSON.stringify(l)).join(", ");
       return `fc.constantFrom(${labels})`;
     }
@@ -74,6 +78,7 @@ function tsType(runtime: RuntimeType): string {
       return el.includes("|") ? `(${el})[]` : `${el}[]`;
     }
     case "enum":
+      if (runtime.labels.length === 0) return "never";
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
 }

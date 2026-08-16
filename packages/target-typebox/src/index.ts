@@ -1,5 +1,16 @@
 import { pathToFileURL } from "node:url";
+import { TypeRegistry } from "@sinclair/typebox";
 import { Value } from "@sinclair/typebox/value";
+
+// The generated modules register these kinds on THEIR typebox instance;
+// under isolated installs the verifier can hold a different instance,
+// so it registers the same kinds on its own (idempotent, same checks).
+if (!TypeRegistry.Has("PgFloat")) {
+  TypeRegistry.Set("PgFloat", (_s, v) => typeof v === "number");
+}
+if (!TypeRegistry.Has("PgDate")) {
+  TypeRegistry.Set("PgDate", (_s, v) => v instanceof Date);
+}
 import type {
   Column,
   Rendered,
@@ -25,13 +36,20 @@ export interface TypeboxTargetOptions extends TargetOptions {
 function typeboxExpr(runtime: RuntimeType): string {
   switch (runtime.kind) {
     case "number":
-      return runtime.integer ? "Type.Integer()" : "Type.Number()";
+      // Floats can really be NaN or +-Infinity; Type.Number() rejects
+      // all three (measured) and Type.Const(NaN) cannot match NaN, so
+      // the registered PgFloat kind checks typeof directly.
+      return runtime.integer
+        ? "Type.Integer()"
+        : 'Type.Unsafe({ [Kind]: "PgFloat" })';
     case "string":
       return "Type.String()";
     case "boolean":
       return "Type.Boolean()";
     case "date":
-      return "Type.Date()";
+      // Invalid Date instances are real driver output (timestamp
+      // 'infinity', BC values); Type.Date() rejects them.
+      return 'Type.Unsafe({ [Kind]: "PgDate" })';
     case "bytes":
       return "Type.Uint8Array()";
     case "json":
@@ -40,6 +58,7 @@ function typeboxExpr(runtime: RuntimeType): string {
     case "array":
       return `Type.Array(${typeboxExpr(runtime.element)})`;
     case "enum": {
+      if (runtime.labels.length === 0) return "Type.Never()";
       const literals = runtime.labels
         .map((l) => `Type.Literal(${JSON.stringify(l)})`)
         .join(", ");
@@ -68,9 +87,25 @@ function tsType(runtime: RuntimeType): string {
       return el.includes("|") ? `(${el})[]` : `${el}[]`;
     }
     case "enum":
+      if (runtime.labels.length === 0) return "never";
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
 }
+
+// The registered kinds above are needed exactly when a float or date
+// column appears anywhere in the table (arrays included).
+function usesRegisteredKinds(table: Table): boolean {
+  const scan = (r: RuntimeType): boolean =>
+    r.kind === "date" ||
+    (r.kind === "number" && !r.integer) ||
+    (r.kind === "array" && scan(r.element));
+  return table.columns.some((c) => scan(c.runtime));
+}
+
+const REGISTRY_PRELUDE = [
+  'if (!TypeRegistry.Has("PgFloat")) TypeRegistry.Set("PgFloat", (_s, v) => typeof v === "number");',
+  'if (!TypeRegistry.Has("PgDate")) TypeRegistry.Set("PgDate", (_s, v) => v instanceof Date);',
+].join("\n");
 
 export function exportNameFor(table: Table, snapshot: Snapshot): string {
   return exportBaseName(table, snapshot) + "Row";
@@ -153,8 +188,15 @@ export class TypeboxTarget implements Target<TypeboxTargetOptions> {
     if (opts.emit?.update && table.kind === "table") {
       parts.push(variantBody(table, strict, `${baseNameFor(table, snapshot)}Update`, () => true));
     }
+    const withKinds = usesRegisteredKinds(table);
+    if (withKinds) parts.unshift(REGISTRY_PRELUDE);
     return {
-      imports: [{ from: "@sinclair/typebox", names: ["Type"] }],
+      imports: [
+        {
+          from: "@sinclair/typebox",
+          names: withKinds ? ["Type", "TypeRegistry", "Kind"] : ["Type"],
+        },
+      ],
       body: parts.join("\n\n"),
       exportName: exportNameFor(table, snapshot),
     };
