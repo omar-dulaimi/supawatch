@@ -1,5 +1,51 @@
 # supawatch
 
+## 0.4.0
+
+### Minor Changes
+
+- 21630d2: Documentation and realtime surfaces. schema-card emits a token-lean
+  schema summary for LLM prompts and agent context. dictionary emits a
+  markdown data dictionary whose comments come from Postgres itself, via
+  new table and column comment introspection that also feeds the diff, so
+  a comment change regenerates live. realtime emits typed supabase-js
+  payload aliases per table under the measured PostgREST wire profile.
+  Enum-array columns now keep a reference to their element enum so
+  wire-profile targets recover real labels, and the watcher aggregates
+  prunes across targets sharing an output directory instead of letting
+  one target delete another's files.
+- bbdd431: AI surfaces on a new functions facet. Core introspects plain Postgres
+  functions (args with defaults, return types, set-returning), the diff
+  reports them, and the Database bridge's Functions placeholder is now
+  filled for typed supabase-js rpc calls. The mcp target emits a generated
+  MCP server with list and get tools per table, validated by the generated
+  Zod schemas and proven over a real client and server pair. The ai-tools
+  target emits Vercel AI SDK tool definitions on the same plan.
+
+### Patch Changes
+
+- Updated dependencies [21630d2]
+- Updated dependencies [bbdd431]
+  - @supawatch/core@0.4.0
+  - @supawatch/watch@0.4.0
+  - @supawatch/target-schema-card@0.4.0
+  - @supawatch/target-dictionary@0.4.0
+  - @supawatch/target-realtime@0.4.0
+  - @supawatch/target-supabase-types@0.4.0
+  - @supawatch/target-mcp@0.4.0
+  - @supawatch/target-ai-tools@0.4.0
+  - @supawatch/target-arktype@0.4.0
+  - @supawatch/target-erd@0.4.0
+  - @supawatch/target-factories@0.4.0
+  - @supawatch/target-fast-check@0.4.0
+  - @supawatch/target-forms@0.4.0
+  - @supawatch/target-json-schema@0.4.0
+  - @supawatch/target-schema-lock@0.4.0
+  - @supawatch/target-trpc@0.4.0
+  - @supawatch/target-typebox@0.4.0
+  - @supawatch/target-valibot@0.4.0
+  - @supawatch/target-zod@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
