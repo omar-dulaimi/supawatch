@@ -21,9 +21,11 @@ export interface ValibotTargetOptions extends TargetOptions {
 function valibotExpr(runtime: RuntimeType): string {
   switch (runtime.kind) {
     case "number":
+      // Floats can really be NaN (measured); v.number() rejects it,
+      // while +-Infinity already passes.
       return runtime.integer
         ? "v.pipe(v.number(), v.integer())"
-        : "v.number()";
+        : "v.union([v.number(), v.nan()])";
     case "string":
       return runtime.format === "uuid"
         ? "v.pipe(v.string(), v.uuid())"
@@ -31,7 +33,9 @@ function valibotExpr(runtime: RuntimeType): string {
     case "boolean":
       return "v.boolean()";
     case "date":
-      return "v.date()";
+      // Invalid Date instances are real driver output for timestamp
+      // 'infinity' and BC values; v.date() rejects them.
+      return "v.instance(Date)";
     case "bytes":
       return "v.instance(Uint8Array)";
     case "json":
@@ -40,6 +44,7 @@ function valibotExpr(runtime: RuntimeType): string {
     case "array":
       return `v.array(${valibotExpr(runtime.element)})`;
     case "enum": {
+      if (runtime.labels.length === 0) return "v.never()";
       const labels = runtime.labels.map((l) => JSON.stringify(l)).join(", ");
       return `v.picklist([${labels}])`;
     }
@@ -66,6 +71,7 @@ function tsType(runtime: RuntimeType): string {
       return el.includes("|") ? `(${el})[]` : `${el}[]`;
     }
     case "enum":
+      if (runtime.labels.length === 0) return "never";
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
 }

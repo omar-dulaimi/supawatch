@@ -60,6 +60,12 @@ export interface IntrospectOptions {
   profile?: DriverProfile;
 }
 
+
+// Internal map key for a relation. A plain schema.name join is ambiguous
+// (schema "a.b" table "c" vs schema "a" table "b.c"); the separator
+// cannot appear in identifiers.
+const relKey = (schema: string, name: string): string => `${schema}\u0000${name}`;
+
 export async function introspect(
   query: Querier,
   schemas: string[] = ["public"],
@@ -72,25 +78,27 @@ export async function introspect(
   // views.
   const relkinds = includeViews ? ["r", "p", "f", "v", "m"] : ["r", "p", "f"];
 
+  // LEFT JOIN: an enum can exist with zero labels, and it must still be
+  // an enum in the snapshot, not an unknown.
   const enumRows = await query<EnumRow>(
     `select n.nspname as enum_schema, t.typname as enum_name, e.enumlabel as label
      from pg_type t
-     join pg_enum e on e.enumtypid = t.oid
+     left join pg_enum e on e.enumtypid = t.oid
      join pg_namespace n on n.oid = t.typnamespace
-     where n.nspname = any($1)
+     where n.nspname = any($1) and t.typtype = 'e'
      order by t.typname, e.enumsortorder`,
     [schemas],
   );
 
   const enums = new Map<string, EnumType>();
   for (const r of enumRows) {
-    const key = `${r.enum_schema}.${r.enum_name}`;
+    const key = relKey(r.enum_schema, r.enum_name);
     let e = enums.get(key);
     if (!e) {
       e = { schema: r.enum_schema, name: r.enum_name, labels: [] };
       enums.set(key, e);
     }
-    e.labels.push(r.label);
+    if (r.label !== null) e.labels.push(r.label);
   }
   const enumList = [...enums.values()];
 
@@ -313,7 +321,7 @@ export async function introspect(
   );
   const policiesByTable = new Map<string, import("./types.js").RlsPolicy[]>();
   for (const r of policyRows) {
-    const key = `${r.table_schema}.${r.table_name}`;
+    const key = relKey(r.table_schema, r.table_name);
     const list = policiesByTable.get(key) ?? [];
     list.push({
       name: r.policy_name,
@@ -347,7 +355,7 @@ export async function introspect(
   );
   const pkByTable = new Map<string, string[]>();
   for (const r of pkRows) {
-    pkByTable.set(`${r.table_schema}.${r.table_name}`, r.columns);
+    pkByTable.set(relKey(r.table_schema, r.table_name), r.columns);
   }
 
   const fkRows = await query<{
@@ -383,7 +391,7 @@ export async function introspect(
   );
   const fksByTable = new Map<string, ForeignKey[]>();
   for (const r of fkRows) {
-    const key = `${r.table_schema}.${r.table_name}`;
+    const key = relKey(r.table_schema, r.table_name);
     const list = fksByTable.get(key) ?? [];
     list.push({
       name: r.fk_name,
@@ -428,7 +436,7 @@ export async function introspect(
     [schemas, relkinds],
   );
   for (const r of relRows) {
-    const key = `${r.table_schema}.${r.table_name}`;
+    const key = relKey(r.table_schema, r.table_name);
     tables.set(key, {
       schema: r.table_schema,
       name: r.table_name,
@@ -443,7 +451,7 @@ export async function introspect(
   }
 
   for (const r of columnRows) {
-    const key = `${r.table_schema}.${r.table_name}`;
+    const key = relKey(r.table_schema, r.table_name);
     let table = tables.get(key);
     if (!table) {
       table = {

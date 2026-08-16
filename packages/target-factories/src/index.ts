@@ -114,6 +114,7 @@ export class FactoriesTarget implements Target<FactoriesTargetOptions> {
           return el.includes("|") ? `(${el})[]` : `${el}[]`;
         }
         case "enum":
+          if (runtime.labels.length === 0) return "never";
           return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
       }
     };

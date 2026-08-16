@@ -104,6 +104,7 @@ function literalFor(
     case "json":
       return sqlString("{}") + "::jsonb";
     case "enum": {
+      if (runtime.labels.length === 0) return null; // zero-label enums hold nothing
       const label = runtime.labels[rowIndex % runtime.labels.length];
       return sqlString(label) + `::"${col.pgTypeName.replace(/^_/, "")}"`;
     }
@@ -241,6 +242,9 @@ export class SeedTarget implements Target<SeedTargetOptions> {
       if (!pkName) return null;
       const col = t.columns.find((c) => c.name === pkName);
       if (!col) return null;
+      // A stored-generated pk computes its own value from an expression
+      // the generator cannot predict; children cannot reference it.
+      if (col.generated) return null;
       if (col.runtime.kind === "number") return String(i + 1);
       // bigint primary keys arrive as strings from the driver but seed
       // sequentially like any serial, so sequences resync and post-seed
@@ -290,6 +294,17 @@ export class SeedTarget implements Target<SeedTargetOptions> {
           continue;
         }
         if (col.name === pk) {
+          // A pk with no honest literal (interval, composite, ...) can
+          // only work when the database fills it; without a default the
+          // table cannot be seeded at all.
+          const pkProbe = literalFor(col.runtime, col, table, 0, mulberry32(1), baseTypeOf);
+          if (pkProbe === null) {
+            if (col.identity || col.hasDefault) continue; // db fills it
+            skipReasons.push(
+              `primary key ${col.name} has no honest literal (${col.sqlType})`,
+            );
+            continue;
+          }
           cols.push(col);
           continue;
         }
@@ -308,6 +323,16 @@ export class SeedTarget implements Target<SeedTargetOptions> {
             if (!col.nullable && !col.hasDefault) {
               skipReasons.push(
                 `foreign key ${col.name} references ${fk.referencedTable}(${fk.referencedColumns.join(", ")}), not its primary key`,
+              );
+            }
+            continue;
+          }
+          // ... and the parent's pk values must be predictable
+          // (generated or literal-less pks are not).
+          if (parent !== undefined && pkLiteral(parent, 0) === null) {
+            if (!col.nullable && !col.hasDefault) {
+              skipReasons.push(
+                `foreign key ${col.name} references ${fk.referencedTable}, whose primary key values the generator cannot predict`,
               );
             }
             continue;

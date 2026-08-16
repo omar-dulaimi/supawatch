@@ -49,6 +49,16 @@ insert into parcels (note, size) values
   ('first', row(100, 40)::dimensions),
   (null, null);
 
+-- Pathological but REAL values: floats can be NaN and infinities,
+-- temporal columns can be 'infinity' (an Invalid Date at the driver),
+-- and an enum can exist with zero labels. Every target must accept
+-- these rows, because the database holds them.
+create type unlabeled as enum ();
+insert into parcels (note, ratio, wide, seen_at, shipped_on) values
+  ('nan-row', 'NaN', 'NaN', 'infinity', 'infinity'),
+  ('inf-row', 'Infinity', '-Infinity', '-infinity', '0044-03-15 BC');
+alter table parcels add column phase unlabeled;
+
 create view lost_parcels as
   select id, tracking, state from parcels where state = 'lost';
 `;

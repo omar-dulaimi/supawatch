@@ -20,13 +20,20 @@ export interface ZodTargetOptions extends TargetOptions {
 function zodExpr(runtime: RuntimeType): string {
   switch (runtime.kind) {
     case "number":
-      return runtime.integer ? "z.number().int()" : "z.number()";
+      // Floats can really be NaN or +-Infinity in Postgres, and the
+      // driver hands them over as those JS numbers; z.number() alone
+      // rejects all three (measured).
+      return runtime.integer
+        ? "z.number().int()"
+        : "z.union([z.number(), z.nan(), z.literal(Infinity), z.literal(-Infinity)])";
     case "string":
       return runtime.format === "uuid" ? "z.uuid()" : "z.string()";
     case "boolean":
       return "z.boolean()";
     case "date":
-      return "z.date()";
+      // timestamp 'infinity' and BC dates arrive as Invalid Date
+      // instances (measured); z.date() rejects them, instanceof does not.
+      return "z.instanceof(Date)";
     case "bytes":
       return "z.instanceof(Uint8Array)"; // Buffer is a Uint8Array subclass
     case "json":
@@ -35,6 +42,7 @@ function zodExpr(runtime: RuntimeType): string {
     case "array":
       return `z.array(${zodExpr(runtime.element)})`;
     case "enum": {
+      if (runtime.labels.length === 0) return "z.never()";
       const labels = runtime.labels.map((l) => JSON.stringify(l)).join(", ");
       return `z.enum([${labels}])`;
     }
@@ -62,6 +70,7 @@ function tsType(runtime: RuntimeType): string {
       return el.includes("|") ? `(${el})[]` : `${el}[]`;
     }
     case "enum":
+      if (runtime.labels.length === 0) return "never";
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
 }

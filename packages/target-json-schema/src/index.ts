@@ -43,6 +43,9 @@ function schemaFor(runtime: RuntimeType): Record<string, unknown> {
     case "array":
       return { type: "array", items: schemaFor(runtime.element) };
     case "enum":
+      // draft-07 requires enum arrays to be non-empty; a zero-label
+      // enum accepts nothing, which "not anything" encodes.
+      if (runtime.labels.length === 0) return { not: {} };
       return { enum: runtime.labels };
   }
 }
@@ -50,7 +53,7 @@ function schemaFor(runtime: RuntimeType): Record<string, unknown> {
 function fieldSchema(col: Column): Record<string, unknown> {
   const base = schemaFor(col.runtime);
   if (!col.nullable) return base;
-  if (Object.keys(base).length === 0 || !("type" in base) && !("enum" in base)) {
+  if (Object.keys(base).length === 0) {
     return base; // accept-anything already includes null
   }
   return { anyOf: [base, { type: "null" }] };

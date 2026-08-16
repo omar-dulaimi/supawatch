@@ -220,7 +220,7 @@ awk "index(\$0, \"'refunded'\") { f = 1 } END { exit !f }" "$OUT/arktype/orders.
 awk 'index($0, "Type.Literal(\"refunded\")") { f = 1 } END { exit !f }' "$OUT/typebox/orders.mjs" || fail "typebox enum missing refunded"
 awk 'index($0, "\"totals\": z.string().nullable()") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "composite column not mapped to string"
 awk 'index($0, "\"tags\": z.array(z.string())") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "array column not mapped"
-awk 'index($0, "\"expires_on\": z.date().nullable()") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "date column not mapped"
+awk 'index($0, "\"expires_on\": z.instanceof(Date).nullable()") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "date column not mapped"
 awk 'index($0, "\"receipt\": z.instanceof(Uint8Array).nullable()") { f = 1 } END { exit !f }' "$OUT/zod/orders.mjs" || fail "bytea column not mapped"
 awk 'index($0, "\"email\": z.string()") { f = 1 } END { exit !f }' "$OUT/zod/users.mjs" || fail "domain column not resolved to base string"
 [ -f "$OUT/zod/paid_orders.mjs" ] || fail "view paid_orders not emitted"
@@ -455,7 +455,7 @@ awk 'index($0, "export interface Database") { f = 1 } END { exit !f }' "$PROUT/d
 awk 'index($0, "orders_user_id_fkey") { f = 1 } END { exit !f }' "$PROUT/database.types.ts" || fail "FK relationship missing"
 awk 'index($0, "order_status:") { f = 1 } END { exit !f }' "$PROUT/database.types.ts" || fail "enum missing from bridge"
 awk 'index($0, "total: number;") { f = 1 } END { exit !f }' "$PROUT/database.types.ts" || fail "numeric not number in bridge Row"
-awk 'index($0, "\"total\": z.number()") { f = 1 } END { exit !f }' "$PROUT/zod/orders.mjs" || fail "profile zod schema still string for numeric"
+awk 'index($0, "\"total\": z.union([z.number()") { f = 1 } END { exit !f }' "$PROUT/zod/orders.mjs" || fail "profile zod schema still string for numeric"
 
 echo "== 11b. Ground truth for the profile: parse real PostgREST JSON =="
 docker exec -i supawatch-e2e-pg psql -U postgres -d e2e -v ON_ERROR_STOP=1 <<'SQL' >/dev/null

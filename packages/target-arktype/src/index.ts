@@ -30,7 +30,12 @@ type ArkField =
 function arkExpr(runtime: RuntimeType): ArkField {
   switch (runtime.kind) {
     case "number":
-      return { lang: "dsl", code: runtime.integer ? "number.integer" : "number" };
+      // Floats can really be NaN (measured); the DSL number keyword
+      // rejects it, while +-Infinity already passes.
+      return {
+        lang: "dsl",
+        code: runtime.integer ? "number.integer" : "number | number.NaN",
+      };
     case "string":
       return {
         lang: "dsl",
@@ -39,7 +44,13 @@ function arkExpr(runtime: RuntimeType): ArkField {
     case "boolean":
       return { lang: "dsl", code: "boolean" };
     case "date":
-      return { lang: "dsl", code: "Date" };
+      // ArkType's Date keyword and type.instanceOf(Date) both reject
+      // Invalid Date instances (measured), which are real driver output
+      // for timestamp 'infinity' and BC values; narrow to instanceof.
+      return {
+        lang: "expr",
+        code: 'type("unknown").narrow((v, ctx) => v instanceof Date || ctx.mustBe("a Date"))',
+      };
     case "bytes":
       return { lang: "expr", code: "type.instanceOf(Uint8Array)" };
     case "json":
@@ -55,6 +66,7 @@ function arkExpr(runtime: RuntimeType): ArkField {
       };
     }
     case "enum":
+      if (runtime.labels.length === 0) return { lang: "dsl", code: "never" };
       return {
         lang: "dsl",
         code: runtime.labels.map((l) => `'${l.replace(/'/g, "\\'")}'`).join("|"),
@@ -82,6 +94,7 @@ function tsType(runtime: RuntimeType): string {
       return el.includes("|") ? `(${el})[]` : `${el}[]`;
     }
     case "enum":
+      if (runtime.labels.length === 0) return "never";
       return runtime.labels.map((l) => JSON.stringify(l)).join(" | ");
   }
 }

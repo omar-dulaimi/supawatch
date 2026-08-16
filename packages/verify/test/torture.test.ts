@@ -273,6 +273,103 @@ describe("torture 2: hostile relations and seeds", () => {
   });
 });
 
+describe("torture 3: pathological values, degenerate types, hostile names", () => {
+  it("a NOT NULL zero-label enum column fails loudly", async () => {
+    const dbe = new PGlite();
+    await dbe.exec("create type nada as enum (); create table t (id serial primary key, phase nada not null)");
+    const dir = await mkdtemp(path.join(tmpdir(), "nada-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(dbe),
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        verifyRows: false,
+        log: () => {},
+      });
+      await expect(watcher.runOnce()).rejects.toThrow(/zero labels and is NOT NULL/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await dbe.close();
+    }
+  });
+
+  it("a relation name containing a newline fails loudly (ESM strips it from import URLs)", async () => {
+    const dbn = new PGlite();
+    await dbn.exec('create table "line\nbreak" (id serial primary key)');
+    const dir = await mkdtemp(path.join(tmpdir(), "nl-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(dbn),
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        verifyRows: false,
+        log: () => {},
+      });
+      await expect(watcher.runOnce()).rejects.toThrow(/control character/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await dbn.close();
+    }
+  });
+
+  it("dotted schema and table names that collide on one file fail loudly", async () => {
+    const dbd = new PGlite();
+    await dbd.exec(`
+      create schema "a.b";
+      create schema a;
+      create table "a.b".c (id serial primary key);
+      create table a."b.c" (id serial primary key);
+    `);
+    const dir = await mkdtemp(path.join(tmpdir(), "dotted-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(dbd),
+        schemas: ["a.b", "a"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        verifyRows: false,
+        log: () => {},
+      });
+      await expect(watcher.runOnce()).rejects.toThrow(/both emit the file "a\.b\.c/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await dbd.close();
+    }
+  });
+
+  it("seed refuses unpredictable primary keys and their children by name", async () => {
+    const { SeedTarget } = await import("@supawatch/target-seed");
+    const dbs = new PGlite();
+    await dbs.exec(`
+      create table gen_parents (
+        src int not null,
+        id int generated always as (src * 10) stored primary key
+      );
+      create table gen_children (
+        id serial primary key,
+        parent_id int not null references gen_parents(id)
+      );
+      create table clocked (span interval primary key, note text);
+    `);
+    const snap = await introspect(querierFromPglite(dbs));
+    const sql = new SeedTarget().renderSnapshot(snap, { rows: 2 })[0].content;
+    expect(sql).toContain('insert into "public"."gen_parents"');
+    expect(sql).toContain(
+      "-- skipped public.gen_children: foreign key parent_id references gen_parents, whose primary key values the generator cannot predict",
+    );
+    expect(sql).toContain(
+      "-- skipped public.clocked: primary key span has no honest literal (interval)",
+    );
+    await dbs.exec(sql); // gen_parents rows compute their own ids
+    const q = querierFromPglite(dbs);
+    const [{ n }] = await q<{ n: unknown }>("select count(*)::int as n from gen_parents");
+    expect(Number(n)).toBe(2);
+    await dbs.close();
+  });
+});
+
 describe("multi-schema watcher run stays coherent end to end", () => {
   it("emits prefixed files whose barrel re-exports prefixed names", async () => {
     // inside the repo so the generated module's zod import resolves
