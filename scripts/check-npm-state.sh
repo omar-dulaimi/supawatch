@@ -6,7 +6,8 @@ for p in supawatch @supawatch/core @supawatch/target-zod @supawatch/watch \
   @supawatch/target-erd @supawatch/target-schema-lock @supawatch/target-json-schema \
   @supawatch/target-fast-check @supawatch/target-forms @supawatch/target-factories \
   @supawatch/target-trpc @supawatch/target-schema-card @supawatch/target-dictionary \
-  @supawatch/target-realtime @supawatch/target-mcp @supawatch/target-ai-tools; do
+  @supawatch/target-realtime @supawatch/target-mcp @supawatch/target-ai-tools \
+  @supawatch/target-seed; do
   v=$(npm view "$p" version 2>/dev/null)
   echo "$p: ${v:-NOT PUBLISHED}"
 done
