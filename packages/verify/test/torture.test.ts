@@ -370,6 +370,60 @@ describe("torture 3: pathological values, degenerate types, hostile names", () =
   });
 });
 
+describe("the ERD parses under real mermaid, hostile names included", () => {
+  it("hostile identifiers render as aliases and the diagram parses; the raw form must fail", async () => {
+    const { JSDOM } = await import("jsdom");
+    const dom = new JSDOM("<!DOCTYPE html><body></body>");
+    (globalThis as Record<string, unknown>).window = dom.window;
+    (globalThis as Record<string, unknown>).document = dom.window.document;
+    Object.defineProperty(globalThis, "navigator", {
+      value: dom.window.navigator,
+      configurable: true,
+    });
+    const mermaid = (await import("mermaid")).default;
+
+    const dbh = new PGlite();
+    await dbh.exec(`
+      create schema aux;
+      create table "users; drop table users--" (
+        id serial primary key,
+        "'); delete from x; --" text,
+        "café" text,
+        "0" text,
+        "1e3" text
+      );
+      create table "Order Log" (id serial primary key, "weird name" text);
+      create table settings (key text primary key);
+      create table aux.settings (key text primary key);
+      create table notes (
+        id serial primary key,
+        log_id int not null references "Order Log"(id)
+      );
+    `);
+    const snap = await introspect(querierFromPglite(dbh), ["public", "aux"]);
+    const { ErdTarget } = await import("@supawatch/target-erd");
+    const [file] = new ErdTarget().renderSnapshot(snap, {});
+    const body = file.content
+      .split("```mermaid\n")[1]
+      .split("\n```")[0];
+
+    const verdict = await mermaid.parse(body, { suppressErrors: true });
+    expect(verdict).toBeTruthy();
+    // display aliases carry the real names
+    expect(body).toContain('["public.users; drop table users--"]');
+    expect(body).toContain('"column: \'); delete from x; --"');
+    // same-named tables across schemas stay distinct entities
+    expect(body).toContain("public_settings");
+    expect(body).toContain("aux_settings");
+
+    // must-fire control: the checker really detects broken diagrams
+    const broken = "erDiagram\n  users; drop table users-- { int id }";
+    expect(await mermaid.parse(broken, { suppressErrors: true })).toBe(false);
+
+    await dbh.close();
+  });
+});
+
 describe("multi-schema watcher run stays coherent end to end", () => {
   it("emits prefixed files whose barrel re-exports prefixed names", async () => {
     // inside the repo so the generated module's zod import resolves

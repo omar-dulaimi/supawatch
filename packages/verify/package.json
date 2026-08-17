@@ -79,6 +79,8 @@
     "fast-check": "^4.9.0",
     "graphql": "^16.14.2",
     "hono": "^4.13.2",
+    "jsdom": "^25.0.1",
+    "mermaid": "^11.16.1",
     "typescript": "^5.9.0",
     "valibot": "^1.1.0",
     "zod": "^4.0.0"
