@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-orpc",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "oRPC routers generated from live Postgres by supawatch, input-validated by the generated Zod schemas.",
   "keywords": [
     "supabase",
