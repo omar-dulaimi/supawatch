@@ -23,13 +23,22 @@ original in the attribute comment.
 
 ## Large schemas
 
+Two Mermaid behaviors make big schemas render badly, and this target
+works around both by default, stating in a note whenever it trimmed
+something.
+
 Mermaid refuses to render a diagram whose source passes `maxTextSize`
 (its own default is 50000 characters) and shows "Maximum text size in
-diagram exceeded" instead. By default this target keeps the diagram
-renderable: it emits every column when that fits, otherwise key columns
-only, otherwise relationships only, and says which it did in a note above
-the diagram. Set `attributes` (`"all" | "keys" | "none"`) to choose
-explicitly, and `maxTextSize` to match a renderer you have configured with
-a larger limit.
+diagram exceeded" instead. So the target emits every column when that
+fits, otherwise key columns only, otherwise relationships only. Set
+`attributes` (`"all" | "keys" | "none"`) to choose explicitly, and
+`maxTextSize` to match a renderer configured with a larger limit.
+
+Mermaid also lays entities that have no relationships out in a single
+endless row, which stretches the canvas into an unreadable strip. Past
+`maxIsolated` (default 10) those tables are omitted and counted, and past
+`maxEntities` (default 60) the least connected go too. Every relationship
+between the entities that remain is always drawn. Set either to 0 to
+disable that cap.
 
 MIT.
