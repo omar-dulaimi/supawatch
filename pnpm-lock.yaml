@@ -630,6 +630,9 @@ importers:
       mermaid:
         specifier: ^11.16.1
         version: 11.16.1
+      supawatch:
+        specifier: workspace:*
+        version: link:../cli
       typescript:
         specifier: ^5.9.0
         version: 5.9.3

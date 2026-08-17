@@ -35,9 +35,16 @@ function canonical(value: unknown): unknown {
 }
 
 function sortByName<T extends { schema?: string; name: string }>(xs: T[]): T[] {
-  return [...xs].sort((a, b) =>
-    `${a.schema ?? ""}.${a.name}`.localeCompare(`${b.schema ?? ""}.${b.name}`),
-  );
+  // Code point order, never localeCompare: this file is committed and
+  // byte-compared, and ICU collation differs by locale and by build.
+  // Measured: en-US sorts "a A_b a-b ab z Z", sv-SE sorts "A_b a-b ab z
+  // Z a", so two developers would see spurious drift on an identical
+  // schema.
+  return [...xs].sort((a, b) => {
+    const ka = `${a.schema ?? ""}.${a.name}`;
+    const kb = `${b.schema ?? ""}.${b.name}`;
+    return ka < kb ? -1 : ka > kb ? 1 : 0;
+  });
 }
 
 export class SchemaLockTarget implements Target<SchemaLockTargetOptions> {

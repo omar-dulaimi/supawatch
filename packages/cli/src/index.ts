@@ -2,5 +2,11 @@ export { defineConfig, loadConfig, ConfigSchema, TARGET_KINDS } from "./config.j
 export type { SupawatchConfig, TargetConfigItem } from "./config.js";
 export { TARGETS, entryFor, loadTarget } from "./registry.js";
 export { init } from "./init.js";
-export { buildTargetRuns, generateOnce, readDotEnvDatabaseUrl, watchForever } from "./run.js";
+export {
+  buildTargetRuns,
+  generateOnce,
+  readDotEnvDatabaseUrl,
+  watchForever,
+  DRIVER_TRUTH_SETTINGS,
+} from "./run.js";
 export { check, type Drift } from "./check.js";

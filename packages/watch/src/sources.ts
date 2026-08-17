@@ -15,8 +15,10 @@ export interface TriggerSource {
 export function listenSource(
   sql: postgres.Sql,
   onReady?: () => void,
+  onProblem?: (message: string) => void,
 ): TriggerSource {
   let handle: { unlisten: () => Promise<void> } | undefined;
+  let selfTest: { unlisten: () => Promise<void> } | undefined;
   let readyCount = 0;
   return {
     name: "listen",
@@ -26,8 +28,44 @@ export function listenSource(
         onReady?.();
         if (readyCount > 1) onWake("listen-reconnect");
       });
+
+      // A transaction-mode pooler (Supabase's pooled port, PgBouncer in
+      // transaction mode) accepts LISTEN and then never delivers, so the
+      // watcher looks perfectly healthy while being permanently deaf.
+      // Prove delivery on a separate channel, which cannot trigger a
+      // spurious regeneration.
+      let delivered = false;
+      try {
+        // resolves the moment the ping lands, so a healthy setup pays
+        // milliseconds rather than the full timeout
+        const arrived = new Promise<boolean>((resolve) => {
+          const timer = setTimeout(() => resolve(false), 3000);
+          void sql
+            .listen("supawatch_listen_selftest", () => {
+              clearTimeout(timer);
+              resolve(true);
+            })
+            .then(async (h) => {
+              selfTest = h;
+              await sql`select pg_notify('supawatch_listen_selftest', 'ping')`;
+            });
+        });
+        delivered = await arrived;
+      } catch {
+        // fall through to the same warning
+      }
+      if (!delivered) {
+        onProblem?.(
+          "LISTEN is not delivering notifications, so schema changes will never wake this watcher. " +
+            "Transaction-mode poolers (Supabase's pooled port, PgBouncer transaction mode) do not carry LISTEN. " +
+            'Use a direct or session-mode connection, or set source: { kind: "poll" }.',
+        );
+      }
+      await selfTest?.unlisten();
+      selfTest = undefined;
     },
     async stop() {
+      await selfTest?.unlisten();
       await handle?.unlisten();
     },
   };
