@@ -69,6 +69,8 @@ const TargetConfig = z.discriminatedUnion("kind", [
   snapshotConfigFor("erd").extend({
     attributes: z.enum(["all", "keys", "none"]).optional(),
     maxTextSize: z.number().int().positive().optional(),
+    maxEntities: z.number().int().nonnegative().optional(),
+    maxIsolated: z.number().int().nonnegative().optional(),
   }),
   snapshotConfigFor("schema-lock"),
   snapshotConfigFor("schema-card"),

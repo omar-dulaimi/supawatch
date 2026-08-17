@@ -409,6 +409,14 @@ describe("the ERD parses under real mermaid, hostile names included", () => {
 
     const verdict = await mermaid.parse(body, { suppressErrors: true });
     expect(verdict).toBeTruthy();
+    // A relationship diagram without relationships is not a diagram. A
+    // trimming guard once dropped every edge while parse, aliases and
+    // size all still passed.
+    const edges = body.split("\n").filter((l) => l.includes("}o--"));
+    expect(edges.length).toBe(
+      snap.tables.reduce((n, t) => n + t.foreignKeys.length, 0),
+    );
+    expect(edges.some((l) => l.includes("notes") && l.includes("Order_Log"))).toBe(true);
     // display aliases carry the real names
     expect(body).toContain('["public.users; drop table users--"]');
     expect(body).toContain('"column: \'); delete from x; --"');
@@ -428,7 +436,10 @@ describe("the ERD parses under real mermaid, hostile names included", () => {
     // its source) and swaps in an error box; parse does not check size at
     // all, so a diagram can parse and still be undisplayable.
     const big = new PGlite();
+    // every table is connected, so the isolation trim leaves them alone
+    // and the size ladder is what actually runs
     await big.exec(`
+      create table hub (id serial primary key);
       do $$
       declare i int;
       declare j int;
@@ -439,7 +450,9 @@ describe("the ERD parses under real mermaid, hostile names included", () => {
           for j in 1..60 loop
             cols := cols || format('descriptive_column_name_%s text,', j);
           end loop;
-          execute format('create table wide_%s (%s id serial primary key)', i, cols);
+          execute format(
+            'create table wide_%s (%s hub_id int not null references hub(id), id serial primary key)',
+            i, cols);
         end loop;
       end $$;
     `);
@@ -460,11 +473,50 @@ describe("the ERD parses under real mermaid, hostile names included", () => {
     expect(forced.content).toContain("Maximum text size in diagram exceeded");
 
     // a raised budget keeps every column and emits no note
-    const [raised] = new ErdTarget().renderSnapshot(snap, { maxTextSize: 500000 });
+    const [raised] = new ErdTarget().renderSnapshot(snap, {
+      maxTextSize: 500000,
+      maxEntities: 0,
+      maxIsolated: 0,
+    });
     expect(raised.content).not.toContain("[!NOTE]");
     expect(raised.content).not.toContain("[!WARNING]");
 
     await big.close();
+  });
+
+  it("omits relationship-less tables when they would wreck the layout, keeping every edge", async () => {
+    // Mermaid lays isolated entities in one endless row: 40 entities,
+    // mostly isolated, rendered 10000 pixels wide with an empty middle.
+    const dbi = new PGlite();
+    await dbi.exec(`
+      create table hub (id serial primary key, label text);
+      create table spoke_a (id serial primary key, hub_id int not null references hub(id));
+      create table spoke_b (id serial primary key, hub_id int not null references hub(id));
+      do $$
+      declare i int;
+      begin
+        for i in 1..40 loop
+          execute format('create table lonely_%s (id serial primary key, v text)', i);
+        end loop;
+      end $$;
+    `);
+    const snap = await introspect(querierFromPglite(dbi));
+    const { ErdTarget } = await import("@supawatch/target-erd");
+
+    const [trimmed] = new ErdTarget().renderSnapshot(snap, {});
+    expect(trimmed.content).toContain("omits 40 with no relationships");
+    expect(trimmed.content).toContain("hub");
+    expect(trimmed.content).not.toContain("lonely_7");
+    // trimming must never cost an edge
+    const edges = trimmed.content.split("\n").filter((l) => l.includes("}o--"));
+    expect(edges.length).toBe(2);
+
+    // a few isolated tables are harmless and stay
+    const [kept] = new ErdTarget().renderSnapshot(snap, { maxIsolated: 0 });
+    expect(kept.content).toContain("lonely_7");
+    expect(kept.content).not.toContain("[!NOTE]");
+
+    await dbi.close();
   });
 });
 
