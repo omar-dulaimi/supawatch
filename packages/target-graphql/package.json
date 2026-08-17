@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-graphql",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "An executable Pothos GraphQL schema generated from live Postgres by supawatch, typed by driver truth.",
   "keywords": [
     "supabase",
