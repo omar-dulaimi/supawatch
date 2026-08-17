@@ -31,6 +31,13 @@ echo "== 1. Postgres up =="
 docker compose up -d --wait
 
 echo "== 2. Reset schema and output =="
+# Belt and braces alongside the TCP healthcheck: the first statement is
+# the one that races the image's initdb restart, and losing that race
+# failed a release gate with "the database system is shutting down".
+for attempt in 1 2 3 4 5 6 7 8 9 10; do
+  if $PSQL -c 'select 1' >/dev/null 2>&1; then break; fi
+  sleep 2
+done
 $PSQL -c 'drop schema if exists public cascade; create schema public;' >/dev/null
 $PSQL < schema.sql >/dev/null
 rm -rf "$OUT" out-work watch.log tars

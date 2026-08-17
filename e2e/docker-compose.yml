@@ -9,7 +9,13 @@ services:
     ports:
       - "5434:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d e2e"]
+      # -h 127.0.0.1 on purpose. During first boot the image runs initdb
+      # against a TEMPORARY server that listens on the unix socket only,
+      # then shuts it down and starts the real one. A socket based
+      # pg_isready passes against that temporary server, so the next
+      # command can hit "the database system is shutting down"; asking
+      # over TCP only succeeds once the real server is up.
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres -d e2e"]
       interval: 1s
       timeout: 2s
-      retries: 30
+      retries: 60
