@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-schema-lock",
-  "version": "0.14.0",
+  "version": "0.14.1",
   "description": "A canonical committed schema lockfile from supawatch, turning pull-request diffs into schema changelogs.",
   "keywords": [
     "supabase",
