@@ -708,6 +708,47 @@ describe("torture 5: portability, upgrades and long-lived connections", () => {
   });
 });
 
+describe("torture 6: determinism and deployment reality", () => {
+  it("orders committed files by code point, never by locale collation", async () => {
+    const { SchemaLockTarget } = await import("@supawatch/target-schema-lock");
+    const dbo = new PGlite();
+    // names where ICU collations genuinely disagree
+    await dbo.exec(`
+      create table "ärger" (id serial primary key);
+      create table "A_b" (id serial primary key);
+      create table "a-b" (id serial primary key);
+      create table ab (id serial primary key);
+      create table "Zeta" (id serial primary key);
+    `);
+    const snap = await introspect(querierFromPglite(dbo));
+    const emitted = (
+      JSON.parse(new SchemaLockTarget().renderSnapshot(snap, {})[0].content) as {
+        tables: { schema: string; name: string }[];
+      }
+    ).tables.map((t) => `${t.schema}.${t.name}`);
+
+    // must fire: a locale-sensitive sort really does disagree here, so
+    // this test would be meaningless if it did not
+    const enUS = [...emitted].sort((a, b) => a.localeCompare(b, "en-US"));
+    const svSE = [...emitted].sort((a, b) => a.localeCompare(b, "sv-SE"));
+    expect(enUS).not.toEqual(svSE);
+
+    // the file is committed and byte-compared, so its order must be
+    // locale free or two developers see drift on an identical schema
+    expect(emitted).toEqual([...emitted].sort());
+    await dbo.close();
+  });
+
+  it("sends only startup parameters a connection pooler accepts", async () => {
+    const { DRIVER_TRUTH_SETTINGS } = await import("supawatch");
+    // PgBouncer and Supavisor reject unknown startup parameters
+    // outright ("unsupported startup parameter: bytea_output"), which
+    // made supawatch unable to connect through Supabase's pooled port
+    // at all. DateStyle is in the tracked set; the others are not.
+    expect(Object.keys(DRIVER_TRUTH_SETTINGS)).toEqual(["DateStyle"]);
+  });
+});
+
 describe("multi-schema watcher run stays coherent end to end", () => {
   it("emits prefixed files whose barrel re-exports prefixed names", async () => {
     // inside the repo so the generated module's zod import resolves

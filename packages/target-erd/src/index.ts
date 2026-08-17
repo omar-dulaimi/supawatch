@@ -157,11 +157,15 @@ export class ErdTarget implements Target<ErdTargetOptions> {
       omittedIsolated += entities.length - connected.length;
       entities = connected;
       if (entities.length > entityCap) {
-        const ranked = [...entities].sort(
-          (a, b) =>
-            degreeOf(b) - degreeOf(a) ||
-            `${a.schema}.${a.name}`.localeCompare(`${b.schema}.${b.name}`),
-        );
+        // code point order, not locale collation: the diagram is
+        // committed, so its content must not depend on ICU or LANG
+        const ranked = [...entities].sort((a, b) => {
+          const byDegree = degreeOf(b) - degreeOf(a);
+          if (byDegree !== 0) return byDegree;
+          const ka = `${a.schema}.${a.name}`;
+          const kb = `${b.schema}.${b.name}`;
+          return ka < kb ? -1 : ka > kb ? 1 : 0;
+        });
         const kept = new Set(ranked.slice(0, entityCap).map((t) => relKey(t.schema, t.name)));
         omittedConnected = entities.length - kept.size;
         entities = entities.filter((t) => kept.has(relKey(t.schema, t.name)));

@@ -37,11 +37,42 @@ export async function buildTargetRuns(cfg: SupawatchConfig): Promise<TargetRun[]
 // every connection (alter database ... set), so supawatch pins them on
 // its own connections rather than trusting the environment. doctor
 // warns when the environment would corrupt a consumer's connection.
+// Only parameters a connection pooler will accept at startup.
+// PgBouncer and Supavisor allow a small tracked set (DateStyle among
+// them) and reject the rest outright with "unsupported startup
+// parameter", which would make supawatch unable to connect at all
+// through Supabase's pooled port. The settings that cannot be sent
+// safely are reported instead of forced; see warnAboutDriverSettings.
 export const DRIVER_TRUTH_SETTINGS = {
   DateStyle: "ISO, MDY",
-  bytea_output: "hex",
-  IntervalStyle: "postgres",
 } as const;
+
+// bytea_output=escape silently decodes 8 bytes as 1 wrong byte and a
+// non-ISO DateStyle swaps day and month. supawatch pins DateStyle, but a
+// pooled connection cannot be forced, so say so rather than emit
+// verified-looking garbage.
+export async function warnAboutDriverSettings(sql: postgres.Sql): Promise<void> {
+  try {
+    const [s] = await sql<{ datestyle: string; bytea_output: string }[]>`
+      select current_setting('DateStyle') as datestyle,
+             current_setting('bytea_output') as bytea_output`;
+    const problems: string[] = [];
+    if (!s.datestyle.startsWith("ISO")) {
+      problems.push(`DateStyle is ${s.datestyle}, so dates decode with day and month swapped`);
+    }
+    if (s.bytea_output !== "hex") {
+      problems.push(`bytea_output is ${s.bytea_output}, so bytea values decode incorrectly`);
+    }
+    if (problems.length > 0) {
+      console.warn(
+        `[supawatch] warning: ${problems.join("; ")}. Values read from this database are not trustworthy; ` +
+          `set these on the database or role (alter database ... set bytea_output = 'hex').`,
+      );
+    }
+  } catch {
+    // current_setting is not worth failing a run over
+  }
+}
 
 export function connect(): postgres.Sql {
   const url = process.env.DATABASE_URL ?? readDotEnvDatabaseUrl();
@@ -74,6 +105,7 @@ export function readDotEnvDatabaseUrl(cwd = process.cwd()): string | undefined {
 export async function generateOnce(cfg: SupawatchConfig): Promise<void> {
   const sql = connect();
   try {
+    await warnAboutDriverSettings(sql);
     const watcher = new Watcher({
       query: querierFrom(sql),
       schemas: cfg.schemas,
@@ -106,6 +138,7 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
   // parsers at connect time.
   const sql = connect();
   let querySql = connect();
+  await warnAboutDriverSettings(querySql);
   // resolved per call, so a reconnect is picked up immediately
   const query: Querier = (text, params) => querierFrom(querySql)(text, params);
   const refreshTypes = async () => {
@@ -121,8 +154,10 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
           schemas: cfg.schemas,
           includeViews: cfg.includeViews,
         })
-      : listenSource(sql, () =>
-          console.log("[supawatch] idle, listening on schema_changed"),
+      : listenSource(
+          sql,
+          () => console.log("[supawatch] idle, listening on schema_changed"),
+          (problem) => console.warn(`[supawatch] warning: ${problem}`),
         );
   const watcher = new Watcher({
     query,

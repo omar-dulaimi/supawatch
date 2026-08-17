@@ -142,21 +142,39 @@ describe("Watcher cycle against real Postgres (PGlite)", () => {
 
   it("a LISTEN reconnect wakes the watcher, the first ready does not", async () => {
     const { listenSource } = await import("@supawatch/watch");
-    let captured: { onListen?: () => void } = {};
-    const fakeSql = {
-      listen: async (
-        _ch: string,
-        _onNotify: (x: string) => void,
-        onListen?: () => void,
-      ) => {
-        captured.onListen = onListen;
-        return { unlisten: async () => {} };
+    const captured: { onListen?: () => void } = {};
+    // The source also proves delivery on a self-test channel, so the
+    // fake has to behave like a working LISTEN for that one.
+    let selfTestNotify: (() => void) | undefined;
+    const fakeSql = Object.assign(
+      // tagged-template call used for pg_notify
+      async () => {
+        selfTestNotify?.();
+        return [];
       },
-    } as unknown as import("postgres").Sql;
+      {
+        listen: async (
+          ch: string,
+          onNotify: (x: string) => void,
+          onListen?: () => void,
+        ) => {
+          if (ch === "supawatch_listen_selftest") {
+            selfTestNotify = () => onNotify("ping");
+          } else {
+            captured.onListen = onListen;
+          }
+          return { unlisten: async () => {} };
+        },
+      },
+    ) as unknown as import("postgres").Sql;
 
     const wakes: string[] = [];
-    const source = listenSource(fakeSql);
+    const problems: string[] = [];
+    const source = listenSource(fakeSql, undefined, (m) => problems.push(m));
     await source.start((hint) => wakes.push(hint));
+    // delivery worked, so no warning and no spurious wake
+    expect(problems).toEqual([]);
+    expect(wakes).toEqual([]);
 
     captured.onListen!();
     expect(wakes).toEqual([]);
