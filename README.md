@@ -8,19 +8,18 @@ Your Postgres schema, compiled to everything. A DDL event trigger rings
 target you configured, and everything runnable is verified against real
 rows before you trust it. No manual generate step to forget.
 
-Built Supabase-first, works on any Postgres. The full menu of generation
-targets is in [Configuration](#configuration) and
-[Packages](#packages) below.
+Built Supabase-first, works on any Postgres.
 
 ## The problem
 
-`supabase gen types` gives you TypeScript types but no runtime validators, and
-both go stale the moment anyone touches the schema. Existing schema-to-Zod
-tools transform that already-lossy CLI output and inherit its blind spots.
+`supabase gen types` gives you TypeScript types but no runtime
+validators, and both go stale the moment anyone touches the schema.
+Existing schema-to-Zod tools transform that already-lossy CLI output and
+inherit its blind spots.
+
 supawatch reads `pg_catalog` directly, maps types by what your driver
-*actually returns* at runtime (Postgres `numeric` arrives as a string,
-`timestamptz` as a `Date`, `int8` as a string), and proves every generated
-schema by parsing real rows from your database.
+*actually returns* at runtime, and proves every generated schema by
+parsing real rows from your database.
 
 ## Quick start
 
@@ -30,9 +29,9 @@ npm install zod   # peer of the zod target
 npx supawatch init
 ```
 
-`init` writes two files: an event-trigger migration (into
-`supabase/migrations/` when a `supabase/` directory exists, `sql/` otherwise)
-and `supawatch.config.ts`:
+`init` writes an event-trigger migration (into `supabase/migrations/`
+when a `supabase/` directory exists, `sql/` otherwise) and a
+`supawatch.config.ts`:
 
 ```ts
 import { defineConfig } from "supawatch";
@@ -45,15 +44,15 @@ export default defineConfig({
 });
 ```
 
-Apply the migration like any other, put `DATABASE_URL` in your environment or
-in `./.env`, then during development run:
+Apply the migration like any other, put `DATABASE_URL` in your
+environment or in `./.env`, then during development run:
 
 ```bash
 npx supawatch watch
 ```
 
-Change the schema from anywhere, a migration, psql, or the Supabase Studio SQL
-editor, and the watcher reacts:
+Change the schema from anywhere, a migration, psql, or the Supabase
+Studio SQL editor, and the watcher reacts:
 
 ```text
 [supawatch] baseline: 3 tables, 1 enums, 4 files
@@ -63,6 +62,8 @@ editor, and the watcher reacts:
 [supawatch] regenerated ... 4 files
 [supawatch] ground-truth check, tasks: 3/3 passed
 ```
+
+## Why the output looks like this
 
 The generated file for a `tasks` table, exactly as emitted:
 
@@ -82,17 +83,34 @@ export const tasksRow = z.strictObject({
 });
 ```
 
-Note `id: z.string()`: the column is `bigint`, and the driver returns bigints
-as strings. `estimate_hours` is `numeric`, also a string at runtime. This is
-the point of the tool: schemas describe what your code receives, not what the
-SQL type chart suggests. A typed `.d.mts` ships beside every file, so imports
-are fully typed in strict TypeScript:
+Note `id: z.string()`. The column is `bigint`, and the driver returns
+bigints as strings. `estimate_hours` is `numeric`, also a string at
+runtime. This is the point of the tool: schemas describe what your code
+receives, not what the SQL type chart suggests.
+
+A typed `.d.mts` ships beside every file, so imports are fully typed in
+strict TypeScript:
 
 ```ts
 import { tasksRow, type tasksRowType } from "./src/schemas/zod/index.mjs";
 
 const tasks: tasksRowType[] = rows.map((row) => tasksRow.parse(row));
 ```
+
+## What it generates
+
+Every target is opt-in. Full descriptions and npm links in
+[docs/packages.md](docs/packages.md).
+
+| Area | Targets |
+| --- | --- |
+| **Validation** | `zod`, `valibot`, `arktype`, `typebox`, `effect`, `json-schema` |
+| **Types** | `supabase-types`, `realtime` |
+| **API surfaces** | `trpc`, `orpc`, `rest`, `service`, `graphql` |
+| **AI** | `mcp`, `ai-tools`, `schema-card` |
+| **Testing and data** | `fast-check`, `factories`, `seed`, `pgtap` |
+| **Database** | `rls`, `pgmq`, `schema-lock` |
+| **Docs and UI** | `erd`, `dictionary`, `forms` |
 
 ## Commands
 
@@ -104,191 +122,37 @@ const tasks: tasksRowType[] = rows.map((row) => tasksRow.parse(row));
 | `supawatch check` | CI drift gate: regenerate in memory, diff against committed files, nonzero exit on drift. Writes nothing. |
 | `supawatch doctor` | Verify the setup end to end: connection, installed trigger, a real LISTEN/NOTIFY round trip, config, each target loads. |
 
-## Configuration
-
-All fields of `supawatch.config.ts`, with defaults:
-
-```ts
-export default defineConfig({
-  schemas: ["public"],
-  outDir: "src/schemas",
-  includeViews: true,        // view columns are all-nullable; see Honest limits
-  barrel: true,              // index.mjs + index.d.mts per target dir
-  profile: "postgres-js",    // or "supabase-js"; see Driver profiles
-  jsonTypes: {               // optional: tighten DECLARED types of json columns
-    "tasks.details": "{ reviewer?: string }",
-  },
-  source: { kind: "listen", debounceMs: 300 },  // or { kind: "poll" } | { kind: "manual" }
-  targets: [
-    { kind: "zod", strict: true, emit: { insert: true, update: true } },
-    { kind: "valibot" },
-    { kind: "arktype" },
-    { kind: "typebox" },
-    { kind: "effect" },          // Effect Schema structs
-    { kind: "json-schema" },     // draft-07, Ajv-verified
-    { kind: "supabase-types" },  // database.types.ts for supabase-js
-    { kind: "fast-check" },      // property-test arbitraries
-    { kind: "factories" },       // typed fixture factories
-    { kind: "forms" },           // field configs for form libraries
-    { kind: "trpc" },            // routers wired to the zod schemas
-    { kind: "orpc" },            // oRPC routers, same validation
-    { kind: "rest" },            // Hono route modules per table
-    { kind: "service" },         // typed repositories over postgres.js
-    { kind: "graphql" },         // executable Pothos schema
-    { kind: "mcp" },             // a generated MCP server
-    { kind: "ai-tools" },        // Vercel AI SDK tools
-    { kind: "realtime" },        // typed realtime payloads
-    { kind: "seed", rows: 3 },   // deterministic FK-aware seed.sql
-    { kind: "pgtap" },           // plan-counted structural test suite
-    { kind: "rls" },             // RLS policy skeletons where needed
-    { kind: "pgmq" },            // typed queue clients per pgmq queue
-    { kind: "erd" },             // Mermaid ER diagram
-    { kind: "dictionary" },      // markdown data dictionary
-    { kind: "schema-card" },     // token-lean LLM context card
-    { kind: "schema-lock" },     // committed canonical snapshot
-  ],
-});
-```
-
-Each validator target needs its library installed in your project (`zod`,
-`valibot`, `arktype`, `@sinclair/typebox`, or `effect`), and the API
-targets need theirs (`hono`, `@orpc/server`, `@pothos/core` with
-`graphql`, `@trpc/server`). Targets accept `path` to
-override their output directory, `strict` (default true) to reject unknown
-keys, and `emit` to add insert/update variants: identity and generated
-columns are excluded, server-fillable columns become optional.
-
-## Driver profiles
-
-Two measured runtime profiles decide how types map:
-
-- `postgres-js` (default): the tagged-template driver. `numeric` and `int8`
-  are strings, `timestamptz` and `date` are `Date`, `bytea` is a
-  `Uint8Array`.
-- `supabase-js`: PostgREST's JSON, for apps reading through
-  `@supabase/supabase-js`. `numeric` and `int8` are JSON numbers, dates are
-  strings, `bytea` is a hex string, enum arrays are real arrays.
-
-> [!WARNING]
-> Under the `supabase-js` profile, `int8` loses precision past 2^53. This was
-> measured, not assumed: the probe watched `9007199254740993` arrive as
-> `9007199254740992` over PostgREST.
-
-The `supabase-types` target emits a `Database` interface compatible with
-`createClient<Database>` generics, including `Relationships` built from real
-foreign-key introspection, always typed under the PostgREST profile.
-
-## How schemas are verified
-
-Every `generate` and every watch cycle parses real rows from your database
-with the schemas it just wrote; a schema nobody has run against real data is
-not reported as success. The repo's own verification harness goes further:
-a value pool over every mapped Postgres type, synthetic negatives per column,
-and cross-target parity, where every validator target must return the
-same accept or reject verdict for every case, with named exceptions only.
-
 ## Honest limits
 
-- JSON column shapes are `unknown`. The catalog cannot verify a shape the
-  database does not enforce. `jsonTypes` tightens the declared TypeScript
-  type only; runtime validation stays `unknown` on purpose.
-- View columns are all nullable, because Postgres reports them that way
-  regardless of the underlying column. The table's `kind: "view"` marker in
-  the IR says why.
-- Composite-type columns are strings. Both drivers return the raw row
-  literal like `"(EUR,950)"`, so an object schema would fail against real
-  rows.
-- Enum arrays are real arrays under both profiles, with one measured
-  caveat: postgres.js fetches custom type parsers when it connects, so a
-  connection opened before the enum type existed returns the raw literal
-  `"{a,b}"` until it reconnects. `supawatch generate` always uses a fresh
-  connection.
-- Floats can really hold `NaN` and the infinities, and temporal columns
-  can hold `infinity` or BC values, which arrive as those JS numbers and
-  as `Date` instances with an invalid time. Generated schemas accept
-  them, because rejecting real rows would be lying.
-- Declared array dimensionality is not enforced by Postgres, so a column
-  declared multidimensional maps to an array of `unknown`.
-- The watcher's LISTEN connection needs a direct or session-mode connection.
-  Transaction-mode poolers (Supavisor port 6543, PgBouncer transaction mode)
-  do not carry LISTEN. Use `source: { kind: "poll" }` where no such
-  connection exists.
-- supawatch does not run migrations, build queries, or replace your ORM. It
-  only reads your schema and writes schema files.
+The constraints worth knowing before you adopt it:
 
-## Supabase specifics
+- JSON column shapes are `unknown`, because the catalog cannot verify a
+  shape the database does not enforce.
+- View columns are all nullable, because Postgres reports them that way.
+- Generated schemas accept `NaN`, the infinities and BC dates, because
+  Postgres really stores them and rejecting real rows would be lying.
+- The watcher's LISTEN connection does not work through transaction-mode
+  poolers. Use a session pooler, a direct connection, or `poll`.
 
-The event trigger works on Supabase because the supautils extension lets the
-`postgres` role create event triggers without superuser. Verified against a
-real hosted project on the free plan: `create event trigger` succeeds as that
-non-superuser role, generation validates live rows over TLS, and RLS state and
-policies introspect correctly. Keep Supabase-managed schemas (`auth`,
-`storage`) out of `schemas` unless you deliberately want them.
+The full list, each one measured, is in [docs/limits.md](docs/limits.md).
+supawatch does not run migrations, build queries, or replace your ORM.
 
-### Which connection string
+## Documentation
 
-Supabase offers three, and the choice decides whether `watch` can work:
-
-| Connection | Port | Use it for |
-| --- | --- | --- |
-| Direct | 5432 | Everything, but it is IPv6 only unless you buy the IPv4 add-on. |
-| Session pooler | 5432 | `watch`. Measured on a hosted project: it carries LISTEN. |
-| Transaction pooler | 6543 | `generate` and `check`. It does NOT carry LISTEN. |
-
-Transaction pooling drops session state, so a watcher there would accept
-LISTEN and then never receive anything. supawatch proves delivery at startup
-and warns when notifications do not arrive, rather than sitting there looking
-healthy, and `supawatch doctor` reports the same failure. Use the session
-pooler or a direct connection for `watch`, or set `source: { kind: "poll" }`,
-which is measured to work through the transaction pooler.
-
-The `supabase-js` profile is verified against the same project end to end:
-PostgREST reads, writes through the generated insert schemas, embedded
-selects across foreign keys, typed `rpc()` calls, and a live Realtime payload
-validated against the generated wire types.
-
-## Packages
-
-| Package | What it is |
+| Page | What is in it |
 | --- | --- |
-| [`supawatch`](https://www.npmjs.com/package/supawatch) | The CLI and config. Start here. |
-| [`@supawatch/core`](https://www.npmjs.com/package/@supawatch/core) | Snapshot IR, introspection, diff, runtime-type map. |
-| [`@supawatch/watch`](https://www.npmjs.com/package/@supawatch/watch) | The watcher runtime and trigger sources, usable as a library. |
-| [`@supawatch/verify`](https://www.npmjs.com/package/@supawatch/verify) | The ground-truth and parity harness. |
-| [`@supawatch/target-zod`](https://www.npmjs.com/package/@supawatch/target-zod) | Zod schemas with insert/update variants. |
-| [`@supawatch/target-valibot`](https://www.npmjs.com/package/@supawatch/target-valibot) | Valibot schemas with insert/update variants. |
-| [`@supawatch/target-arktype`](https://www.npmjs.com/package/@supawatch/target-arktype) | ArkType types with insert/update variants. |
-| [`@supawatch/target-typebox`](https://www.npmjs.com/package/@supawatch/target-typebox) | TypeBox schemas with insert/update variants. |
-| [`@supawatch/target-effect`](https://www.npmjs.com/package/@supawatch/target-effect) | Effect Schema structs with insert/update variants. |
-| [`@supawatch/target-json-schema`](https://www.npmjs.com/package/@supawatch/target-json-schema) | Draft-07 JSON Schemas, Ajv-verified. |
-| [`@supawatch/target-supabase-types`](https://www.npmjs.com/package/@supawatch/target-supabase-types) | The supabase-js `Database` interface: relationships and functions included. |
-| [`@supawatch/target-fast-check`](https://www.npmjs.com/package/@supawatch/target-fast-check) | Property-test arbitraries guaranteed to satisfy the Zod schemas. |
-| [`@supawatch/target-factories`](https://www.npmjs.com/package/@supawatch/target-factories) | Typed fixture factories with the same guarantee. |
-| [`@supawatch/target-forms`](https://www.npmjs.com/package/@supawatch/target-forms) | Framework-agnostic form field configs. |
-| [`@supawatch/target-trpc`](https://www.npmjs.com/package/@supawatch/target-trpc) | tRPC routers wired to the generated schemas. |
-| [`@supawatch/target-orpc`](https://www.npmjs.com/package/@supawatch/target-orpc) | oRPC routers with the same input validation. |
-| [`@supawatch/target-rest`](https://www.npmjs.com/package/@supawatch/target-rest) | Hono route modules, mountable anywhere including Edge Functions. |
-| [`@supawatch/target-service`](https://www.npmjs.com/package/@supawatch/target-service) | Typed repositories over postgres.js: list, findById, create, update, remove. |
-| [`@supawatch/target-graphql`](https://www.npmjs.com/package/@supawatch/target-graphql) | An executable Pothos GraphQL schema typed by driver truth. |
-| [`@supawatch/target-mcp`](https://www.npmjs.com/package/@supawatch/target-mcp) | A generated MCP server, list and get tools per table. |
-| [`@supawatch/target-ai-tools`](https://www.npmjs.com/package/@supawatch/target-ai-tools) | Vercel AI SDK tool definitions. |
-| [`@supawatch/target-realtime`](https://www.npmjs.com/package/@supawatch/target-realtime) | Typed realtime payload aliases under the measured wire profile. |
-| [`@supawatch/target-seed`](https://www.npmjs.com/package/@supawatch/target-seed) | Deterministic FK-aware seed.sql with sequence resync. |
-| [`@supawatch/target-pgtap`](https://www.npmjs.com/package/@supawatch/target-pgtap) | A plan-counted pgTAP structural suite, RLS assertions included. |
-| [`@supawatch/target-rls`](https://www.npmjs.com/package/@supawatch/target-rls) | RLS policy skeletons for exactly the tables that need attention. |
-| [`@supawatch/target-pgmq`](https://www.npmjs.com/package/@supawatch/target-pgmq) | Typed pgmq queue clients, one per detected queue. |
-| [`@supawatch/target-erd`](https://www.npmjs.com/package/@supawatch/target-erd) | A GitHub-rendered Mermaid ER diagram. |
-| [`@supawatch/target-dictionary`](https://www.npmjs.com/package/@supawatch/target-dictionary) | A markdown data dictionary, comments sourced from Postgres. |
-| [`@supawatch/target-schema-card`](https://www.npmjs.com/package/@supawatch/target-schema-card) | A token-lean schema card for LLM prompts. |
-| [`@supawatch/target-schema-lock`](https://www.npmjs.com/package/@supawatch/target-schema-lock) | The committed canonical snapshot behind drift review. |
-
-Every `@supawatch/target-*` npm page carries its own focused README.
+| [Configuration](docs/configuration.md) | Every config field, target options, peer dependencies. |
+| [Packages](docs/packages.md) | What each target emits, with npm links. |
+| [Driver profiles](docs/driver-profiles.md) | How `postgres-js` and `supabase-js` change the mapping. |
+| [Supabase](docs/supabase.md) | The event trigger, and which connection string to use. |
+| [Verification](docs/verification.md) | How generated schemas are proven against real rows. |
+| [Honest limits](docs/limits.md) | Everything supawatch deliberately does not claim. |
 
 ## Status
 
 Pre-1.0, actively developed. The core loop (introspect, generate, verify,
-watch) is stable and tested end to end; expect additive changes and possible
-config adjustments before 1.0.
+watch) is stable and tested end to end; expect additive changes and
+possible config adjustments before 1.0.
 
 ## Development
 
@@ -299,5 +163,6 @@ pnpm run e2e     # Docker Postgres 17, pack-install-run consumer, live DDL
 pnpm run gate    # both
 ```
 
-Releases are changesets-driven: land changes with a changeset, and the
-release workflow versions, gates, and publishes. [MIT](LICENSE).
+Contributions are welcome; [CONTRIBUTING.md](CONTRIBUTING.md) explains
+the one rule that shapes everything else. Releases are changesets-driven.
+[MIT](LICENSE).

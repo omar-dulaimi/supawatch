@@ -1,7 +1,10 @@
 # supawatch
 
-Validator schemas and types generated from your live Postgres, kept in sync
-by the database itself. This package is the CLI and config entry point.
+Your Postgres schema, compiled to everything: validators, types, API
+layers, AI surfaces, tests, seeds and docs. A DDL event trigger tells the
+watcher when the schema moved, so the output regenerates itself, and
+every runnable artifact is verified against real rows. This package is
+the CLI and config entry point.
 
 ```bash
 npm install --save-dev supawatch
@@ -19,7 +22,8 @@ npx supawatch check     # CI drift gate, writes nothing, nonzero exit on drift
 npx supawatch doctor    # verify connection, trigger, LISTEN round trip, targets
 ```
 
-Full documentation, configuration reference, driver profiles, and honest
-limits: [github.com/omar-dulaimi/supawatch](https://github.com/omar-dulaimi/supawatch#readme).
+Targets are opt-in, one per thing you want generated. Full documentation,
+configuration reference, driver profiles, and honest limits:
+[github.com/omar-dulaimi/supawatch](https://github.com/omar-dulaimi/supawatch#readme).
 
 MIT.
