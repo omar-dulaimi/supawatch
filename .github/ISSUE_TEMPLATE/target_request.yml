@@ -1,0 +1,38 @@
+name: New generation target
+description: Something else worth generating from a schema
+labels: [target]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Targets earn their place by removing hand-written code that goes
+        stale. The strongest cases are things people currently maintain
+        by hand and forget to update when the schema changes.
+  - type: input
+    id: what
+    attributes:
+      label: What would it generate
+      placeholder: "Drizzle table definitions"
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: What are people writing by hand today
+      description: And what goes wrong when the schema moves and they forget
+    validations:
+      required: true
+  - type: textarea
+    id: shape
+    attributes:
+      label: A sketch of the emitted output
+      description: Even approximate; it makes the mapping questions obvious
+      render: ts
+  - type: textarea
+    id: verify
+    attributes:
+      label: How could the output be proven correct
+      description: >
+        Every target is verified by using its output: schemas parse real
+        rows, servers answer real calls, SQL is executed. What would that
+        be here?

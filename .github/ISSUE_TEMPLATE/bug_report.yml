@@ -1,0 +1,64 @@
+name: Bug report
+description: Something generated the wrong thing, or nothing at all
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The fastest fix comes from a schema we can recreate. A `create table`
+        statement that reproduces it is worth more than a description of it.
+  - type: input
+    id: version
+    attributes:
+      label: supawatch version
+      placeholder: "0.14.0"
+    validations:
+      required: true
+  - type: input
+    id: postgres
+    attributes:
+      label: Postgres version
+      description: "`select version()`, or the Supabase plan if hosted"
+    validations:
+      required: true
+  - type: dropdown
+    id: connection
+    attributes:
+      label: How do you connect
+      description: This decides whether LISTEN can work at all
+      options:
+        - Direct connection
+        - Supabase session pooler (port 5432)
+        - Supabase transaction pooler (port 6543)
+        - PgBouncer or another pooler
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: schema
+    attributes:
+      label: Schema that reproduces it
+      description: The smallest DDL that shows the problem
+      render: sql
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Your supawatch.config.ts
+      render: ts
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What was generated, and what you expected instead
+      description: Paste the generated output, not a summary of it
+    validations:
+      required: true
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `npx supawatch doctor`
+      description: Redact the connection string if it appears
+      render: text

@@ -1,8 +1,9 @@
 import path from "node:path";
 import { z } from "zod";
 
-// One kind enum feeds the config parser and --only. A discriminated union
-// per kind from day one, the direct fix for drzl's flat 27-kind object.
+// One kind enum feeds the config parser and --only. A discriminated
+// union per kind, so each target declares exactly the options it takes
+// instead of one flat object shared by every kind.
 export const TARGET_KINDS = [
   "zod",
   "valibot",
