@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-zod",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Zod schemas generated from live Postgres by supawatch, mapped to what the driver actually returns.",
   "keywords": [
     "supabase",

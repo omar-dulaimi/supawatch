@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-seed",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Deterministic FK-aware seed.sql generated from live Postgres by supawatch: topological order, identity overriding, sequence resync.",
   "keywords": [
     "supabase",
