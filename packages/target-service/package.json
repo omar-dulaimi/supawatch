@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-service",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "description": "Typed repository layers generated from live Postgres by supawatch: list, findById, create, update, remove over postgres.js.",
   "keywords": [
     "supabase",

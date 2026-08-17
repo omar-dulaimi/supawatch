@@ -1,5 +1,50 @@
 # supawatch
 
+## 0.10.0
+
+### Patch Changes
+
+- 63e8953: Large schemas produced a diagram Mermaid refuses to render. Mermaid caps
+  diagram source at `maxTextSize` (its own default is 50000 characters) and
+  substitutes a "Maximum text size in diagram exceeded" box; the check lives
+  in the render path, so an oversized diagram parses cleanly and still cannot
+  be displayed. The ERD target now keeps its output renderable: it emits every
+  column when that fits, otherwise key columns only, otherwise relationships
+  only, and states which it chose in a note above the diagram. New options
+  `attributes` (`"all" | "keys" | "none"`) and `maxTextSize` make the choice
+  explicit, with an honest warning when an explicit choice cannot render. The
+  suite now asserts emitted size against the limit as well as parsing, since
+  parsing alone never catches this.
+- Updated dependencies [63e8953]
+  - @supawatch/target-erd@0.10.0
+  - @supawatch/core@0.10.0
+  - @supawatch/target-ai-tools@0.10.0
+  - @supawatch/target-arktype@0.10.0
+  - @supawatch/target-dictionary@0.10.0
+  - @supawatch/target-effect@0.10.0
+  - @supawatch/target-factories@0.10.0
+  - @supawatch/target-fast-check@0.10.0
+  - @supawatch/target-forms@0.10.0
+  - @supawatch/target-graphql@0.10.0
+  - @supawatch/target-json-schema@0.10.0
+  - @supawatch/target-mcp@0.10.0
+  - @supawatch/target-orpc@0.10.0
+  - @supawatch/target-pgmq@0.10.0
+  - @supawatch/target-pgtap@0.10.0
+  - @supawatch/target-realtime@0.10.0
+  - @supawatch/target-rest@0.10.0
+  - @supawatch/target-rls@0.10.0
+  - @supawatch/target-schema-card@0.10.0
+  - @supawatch/target-schema-lock@0.10.0
+  - @supawatch/target-seed@0.10.0
+  - @supawatch/target-service@0.10.0
+  - @supawatch/target-supabase-types@0.10.0
+  - @supawatch/target-trpc@0.10.0
+  - @supawatch/target-typebox@0.10.0
+  - @supawatch/target-valibot@0.10.0
+  - @supawatch/target-zod@0.10.0
+  - @supawatch/watch@0.10.0
+
 ## 0.9.1
 
 ### Patch Changes
