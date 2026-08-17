@@ -1,5 +1,39 @@
 # supawatch
 
+## 0.14.1
+
+### Patch Changes
+
+- Updated dependencies [1cecc7c]
+  - @supawatch/core@0.14.1
+  - @supawatch/target-ai-tools@0.14.1
+  - @supawatch/target-arktype@0.14.1
+  - @supawatch/target-dictionary@0.14.1
+  - @supawatch/target-effect@0.14.1
+  - @supawatch/target-erd@0.14.1
+  - @supawatch/target-factories@0.14.1
+  - @supawatch/target-fast-check@0.14.1
+  - @supawatch/target-forms@0.14.1
+  - @supawatch/target-graphql@0.14.1
+  - @supawatch/target-json-schema@0.14.1
+  - @supawatch/target-mcp@0.14.1
+  - @supawatch/target-orpc@0.14.1
+  - @supawatch/target-pgmq@0.14.1
+  - @supawatch/target-pgtap@0.14.1
+  - @supawatch/target-realtime@0.14.1
+  - @supawatch/target-rest@0.14.1
+  - @supawatch/target-rls@0.14.1
+  - @supawatch/target-schema-card@0.14.1
+  - @supawatch/target-schema-lock@0.14.1
+  - @supawatch/target-seed@0.14.1
+  - @supawatch/target-service@0.14.1
+  - @supawatch/target-supabase-types@0.14.1
+  - @supawatch/target-trpc@0.14.1
+  - @supawatch/target-typebox@0.14.1
+  - @supawatch/target-valibot@0.14.1
+  - @supawatch/target-zod@0.14.1
+  - @supawatch/watch@0.14.1
+
 ## 0.14.0
 
 ### Minor Changes
