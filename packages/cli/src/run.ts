@@ -10,6 +10,7 @@ import {
   Watcher,
   type TargetRun,
 } from "@supawatch/watch";
+import type { Querier } from "@supawatch/core";
 import type { SupawatchConfig } from "./config.js";
 import { entryFor, loadTarget } from "./registry.js";
 
@@ -99,8 +100,19 @@ export async function generateOnce(cfg: SupawatchConfig): Promise<void> {
 }
 
 export async function watchForever(cfg: SupawatchConfig): Promise<void> {
+  // Two connections on purpose. The LISTEN connection must stay up for
+  // the life of the watcher, while the query connection gets recycled
+  // whenever custom types change, because the driver only learns type
+  // parsers at connect time.
   const sql = connect();
-  const query = querierFrom(sql);
+  let querySql = connect();
+  // resolved per call, so a reconnect is picked up immediately
+  const query: Querier = (text, params) => querierFrom(querySql)(text, params);
+  const refreshTypes = async () => {
+    const old = querySql;
+    querySql = connect();
+    await old.end();
+  };
   const debounceMs = cfg.source.kind === "listen" ? cfg.source.debounceMs : undefined;
   const source =
     cfg.source.kind === "poll"
@@ -121,10 +133,11 @@ export async function watchForever(cfg: SupawatchConfig): Promise<void> {
     targets: await buildTargetRuns(cfg),
     source,
     debounceMs,
+    refreshTypes,
   });
   const shutdown = async () => {
     await watcher.stop();
-    await sql.end();
+    await Promise.all([sql.end(), querySql.end()]);
     process.exit(0);
   };
   process.on("SIGINT", shutdown);

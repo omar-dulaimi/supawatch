@@ -64,7 +64,10 @@ describe("schema-lock target", () => {
     const b = new SchemaLockTarget().renderSnapshot(again, {})[0];
     expect(a.content).toBe(b.content);
     const parsed = JSON.parse(a.content);
-    expect(parsed.format).toBe(1);
+    // tracks the exported constant: the number moves when the recorded
+    // shape changes, and a literal here would just have to be edited
+    const { FORMAT } = await import("@supawatch/target-schema-lock");
+    expect(parsed.format).toBe(FORMAT);
     expect(parsed.tables.some((t: { name: string }) => t.name === "parcels")).toBe(true);
   });
 });
