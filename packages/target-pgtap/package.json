@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-pgtap",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "A plan-counted pgTAP structural test suite generated from live Postgres by supawatch, RLS and policy assertions included.",
   "keywords": [
     "supabase",
