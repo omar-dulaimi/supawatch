@@ -1,5 +1,11 @@
 # @supawatch/target-ai-tools
 
+## 0.13.0
+
+### Patch Changes
+
+- @supawatch/core@0.13.0
+
 ## 0.12.0
 
 ### Patch Changes
