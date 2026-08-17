@@ -749,6 +749,34 @@ describe("torture 6: determinism and deployment reality", () => {
   });
 });
 
+describe("torture 7: concurrent processes", () => {
+  it("two writers can target the same file without one killing the other", async () => {
+    const { atomicSink } = await import("@supawatch/core");
+    const dir = await mkdtemp(path.join(tmpdir(), "concurrent-"));
+    try {
+      const file = path.join(dir, "same.mjs");
+      // A fixed "<file>.tmp" made concurrent runs collide: one renamed
+      // the shared temp away and the other's rename failed with ENOENT,
+      // killing that run. Realistic whenever a watcher and a manual
+      // generate overlap.
+      const writers = Array.from({ length: 12 }, (_, i) =>
+        atomicSink.write(file, `// writer ${i}\nexport const n = ${i};\n`),
+      );
+      await expect(Promise.all(writers)).resolves.toBeDefined();
+
+      // the survivor must be a whole file from exactly one writer
+      const text = await readFile(file, "utf8");
+      expect(text).toMatch(/^\/\/ writer \d+\nexport const n = \d+;\n$/);
+
+      // and no temp files may be left behind
+      const leftovers = (await readdir(dir)).filter((f) => f.endsWith(".tmp"));
+      expect(leftovers).toEqual([]);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("multi-schema watcher run stays coherent end to end", () => {
   it("emits prefixed files whose barrel re-exports prefixed names", async () => {
     // inside the repo so the generated module's zod import resolves

@@ -11,12 +11,24 @@ export interface FileSink {
   prune(dir: string, keep: Set<string>, extension: string): Promise<string[]>;
 }
 
+// Each write gets its OWN temp name. A fixed `<file>.tmp` collides when
+// two supawatch processes run at once (a watcher plus a manual
+// generate, two CI jobs): one renames the shared temp away and the
+// other's rename fails with ENOENT, killing that run. Unique names let
+// both finish, with the last rename winning and the target never torn.
+let writeCounter = 0;
+
 export const atomicSink: FileSink = {
   async write(file, content) {
     await mkdir(path.dirname(file), { recursive: true });
-    const tmp = `${file}.tmp`;
-    await writeFile(tmp, content);
-    await rename(tmp, file);
+    const tmp = `${file}.${process.pid}.${writeCounter++}.tmp`;
+    try {
+      await writeFile(tmp, content);
+      await rename(tmp, file);
+    } catch (err) {
+      await unlink(tmp).catch(() => {});
+      throw err;
+    }
   },
   async prune(dir, keep, extension) {
     const removed: string[] = [];
