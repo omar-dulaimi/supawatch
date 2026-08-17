@@ -31,14 +31,20 @@ function arbExpr(runtime: RuntimeType): string {
           // decimal string with two places, like the driver's numeric
           return 'fc.integer({ min: -99999999, max: 99999999 }).map((n) => (n / 100).toFixed(2))';
         case "bigint":
-          return "fc.bigInt().map((v) => v.toString())";
+          // int8 is 64 bit; an unbounded bigInt produced 76 digit values
+          // that Postgres rejects outright, so the arbitrary was
+          // claiming rows the database can never hold.
+          return 'fc.bigInt({ min: -(2n ** 63n), max: 2n ** 63n - 1n }).map((v) => v.toString())';
         default:
           return "fc.string()";
       }
     case "boolean":
       return "fc.boolean()";
     case "date":
-      return "fc.date({ noInvalidDate: true })";
+      // Unbounded dates reached year 171958, which the wire protocol
+      // rejects with "time zone displacement out of range". Keep to a
+      // range every Postgres temporal type and the driver can carry.
+      return 'fc.date({ noInvalidDate: true, min: new Date("1900-01-01T00:00:00Z"), max: new Date("2100-01-01T00:00:00Z") })';
     case "bytes":
       return "fc.uint8Array()";
     case "json":

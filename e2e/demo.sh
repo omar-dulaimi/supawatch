@@ -436,6 +436,36 @@ awk 'index($0, "drift (stale)") { f = 1 } END { exit !f }' check-drift.log || fa
 (cd out-work && "$CLI" generate >/dev/null) || fail "generate could not repair drift"
 (cd out-work && "$CLI" check) || fail "check still drifting after regenerate"
 
+echo "== 10b. driver-truth settings: a corrupting database default must not corrupt supawatch =="
+# Measured: with bytea_output=escape an 8 byte value decodes to 1 wrong
+# byte, and with DateStyle=German a date comes back day/month swapped,
+# both silently. A database can force either on every connection.
+$PSQL -c "alter database e2e set bytea_output to 'escape'" >/dev/null
+$PSQL -c "alter database e2e set datestyle to 'German, DMY'" >/dev/null
+(cd out-work && "$CLI" generate >/dev/null 2>&1) || fail "generate broke under corrupting database defaults"
+(cd out-work && node -e "
+const pg = require('postgres');
+// no connection settings: exactly what a plain consumer gets
+const plain = pg(process.env.DATABASE_URL, { max: 1 });
+const pinned = pg(process.env.DATABASE_URL, { max: 1, connection: { DateStyle: 'ISO, MDY', bytea_output: 'hex' } });
+Promise.all([
+  plain.unsafe(\"select '\\\\x89504e470d0a1a0a'::bytea as b, '2026-03-04'::date as d\"),
+  pinned.unsafe(\"select '\\\\x89504e470d0a1a0a'::bytea as b, '2026-03-04'::date as d\"),
+]).then(async ([[p], [q]]) => {
+  const bad = p.b.length !== 8 || p.d.toISOString().slice(0, 10) !== '2026-03-04';
+  const good = q.b.length === 8 && q.d.toISOString().slice(0, 10) === '2026-03-04';
+  if (!bad) { console.error('control did not fire: unpinned read was already correct'); process.exit(1); }
+  if (!good) { console.error('pinned connection still wrong: ' + q.b.length + ' bytes, ' + q.d.toISOString()); process.exit(1); }
+  console.log('driver truth: unpinned ' + p.b.length + ' bytes/' + p.d.toISOString().slice(0, 10) + ', pinned ' + q.b.length + ' bytes/' + q.d.toISOString().slice(0, 10));
+  await plain.end(); await pinned.end();
+})") || fail "pinned settings did not restore driver truth"
+(cd out-work && "$CLI" doctor > ../doctor-settings.log 2>&1) && fail "doctor passed while the database corrupts consumer connections"
+awk 'index($0, "driver settings") && index($0, "bytea_output is escape") { f = 1 } END { exit !f }' doctor-settings.log \
+  || fail "doctor did not name the corrupting settings"
+$PSQL -c "alter database e2e reset bytea_output" >/dev/null
+$PSQL -c "alter database e2e reset datestyle" >/dev/null
+(cd out-work && "$CLI" doctor >/dev/null 2>&1) || fail "doctor still unhealthy after resetting the database defaults"
+
 echo "== 11. supabase-js profile: generate for PostgREST and verify against the real thing =="
 PROUT="$ROOT/e2e/out-work/generated-postgrest"
 cat > out-work/supawatch.config.ts <<CFG

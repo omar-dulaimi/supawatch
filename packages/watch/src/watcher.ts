@@ -332,6 +332,14 @@ export class Watcher {
         this.log(`ground-truth check, ${table.name}: skipped (foreign table read failed)`);
         return { table: table.name, rows: 0, passed: 0, reasons: [] };
       }
+      // pg_catalog is world readable, so a restricted role introspects
+      // tables it cannot SELECT from (routine on Supabase). Its schema
+      // is still correct and worth writing; only the row evidence is
+      // missing, so skip that one table instead of killing the run.
+      if (/permission denied/i.test(String(err))) {
+        this.log(`ground-truth check, ${table.name}: skipped (permission denied for this role)`);
+        return { table: table.name, rows: 0, passed: 0, reasons: [] };
+      }
       throw err;
     }
     let passed = 0;
@@ -345,14 +353,30 @@ export class Watcher {
   }
 
   private reportVerified(result: CycleResult) {
-    for (const v of result.verified) {
-      if (v.passed === v.rows) {
-        this.log(`ground-truth check, ${v.table}: ${v.passed}/${v.rows} passed`);
-      } else {
-        this.log(
-          `ground-truth check, ${v.table}: ${v.passed}/${v.rows} FAILED (${v.reasons[0] ?? "no reason"})`,
-        );
-      }
+    for (const line of describeVerified(result.verified)) this.log(line);
+  }
+}
+
+// One description of a verification result, shared by the watcher and
+// the CLI: they had drifted, so a fix to the wording landed in only one
+// of them.
+export function describeVerified(
+  verified: CycleResult["verified"],
+): string[] {
+  const lines: string[] = [];
+  for (const v of verified) {
+    if (v.rows === 0) {
+      // "0/0 passed" reads like success while proving nothing. An empty
+      // table, or one whose rows an RLS policy hides from this role,
+      // gives no evidence at all, and saying so is the point.
+      lines.push(`ground-truth check, ${v.table}: no rows visible, nothing verified`);
+    } else if (v.passed === v.rows) {
+      lines.push(`ground-truth check, ${v.table}: ${v.passed}/${v.rows} passed`);
+    } else {
+      lines.push(
+        `ground-truth check, ${v.table}: ${v.passed}/${v.rows} FAILED (${v.reasons[0] ?? "no reason"})`,
+      );
     }
   }
+  return lines;
 }
