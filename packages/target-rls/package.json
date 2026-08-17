@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-rls",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "Row level security policy skeletons generated from live Postgres by supawatch for exactly the tables that need attention.",
   "keywords": [
     "supabase",

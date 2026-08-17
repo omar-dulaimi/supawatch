@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-trpc",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "tRPC routers generated from live Postgres by supawatch, input-validated by the generated Zod schemas.",
   "keywords": [
     "supabase",
