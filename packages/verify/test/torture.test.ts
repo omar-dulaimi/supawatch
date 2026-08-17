@@ -422,6 +422,50 @@ describe("the ERD parses under real mermaid, hostile names included", () => {
 
     await dbh.close();
   });
+
+  it("stays under Mermaid's render limit by trimming attributes, and says so", async () => {
+    // Mermaid refuses to RENDER past 50000 characters (MAX_TEXTLENGTH in
+    // its source) and swaps in an error box; parse does not check size at
+    // all, so a diagram can parse and still be undisplayable.
+    const big = new PGlite();
+    await big.exec(`
+      do $$
+      declare i int;
+      declare j int;
+      declare cols text;
+      begin
+        for i in 1..70 loop
+          cols := '';
+          for j in 1..60 loop
+            cols := cols || format('descriptive_column_name_%s text,', j);
+          end loop;
+          execute format('create table wide_%s (%s id serial primary key)', i, cols);
+        end loop;
+      end $$;
+    `);
+    const snap = await introspect(querierFromPglite(big));
+    const { ErdTarget } = await import("@supawatch/target-erd");
+
+    const [auto] = new ErdTarget().renderSnapshot(snap, {});
+    const autoBody = auto.content.split("```mermaid\n")[1].split("\n```")[0];
+    expect(autoBody.length).toBeLessThanOrEqual(50000);
+    expect(auto.content).toContain("exceeds Mermaid's 50000 character render limit");
+    expect(auto.content).toContain("key columns only");
+
+    // an explicit choice is honored, with an honest warning when it will
+    // not render
+    const [forced] = new ErdTarget().renderSnapshot(snap, { attributes: "all" });
+    const forcedBody = forced.content.split("```mermaid\n")[1].split("\n```")[0];
+    expect(forcedBody.length).toBeGreaterThan(50000);
+    expect(forced.content).toContain("Maximum text size in diagram exceeded");
+
+    // a raised budget keeps every column and emits no note
+    const [raised] = new ErdTarget().renderSnapshot(snap, { maxTextSize: 500000 });
+    expect(raised.content).not.toContain("[!NOTE]");
+    expect(raised.content).not.toContain("[!WARNING]");
+
+    await big.close();
+  });
 });
 
 describe("multi-schema watcher run stays coherent end to end", () => {

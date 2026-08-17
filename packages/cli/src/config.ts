@@ -66,7 +66,10 @@ const TargetConfig = z.discriminatedUnion("kind", [
   targetConfigFor("factories"),
   targetConfigFor("trpc").extend({ schemasImportPath: z.string().optional() }),
   SupabaseTypesConfig,
-  snapshotConfigFor("erd"),
+  snapshotConfigFor("erd").extend({
+    attributes: z.enum(["all", "keys", "none"]).optional(),
+    maxTextSize: z.number().int().positive().optional(),
+  }),
   snapshotConfigFor("schema-lock"),
   snapshotConfigFor("schema-card"),
   snapshotConfigFor("dictionary"),
