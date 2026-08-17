@@ -13,7 +13,11 @@ import type {
 
 export type SchemaLockTargetOptions = TargetOptions;
 
-const FORMAT = 1;
+// Bumped when the recorded shape changes, so an older committed
+// lockfile is recognised as one rather than reported as schema drift.
+// 2 added table kind, rlsEnabled and policies, and domain
+// hasConstraints.
+export const FORMAT = 2;
 
 // Canonicalize: sort every object's keys and every named collection, so
 // the file is byte-stable for an unchanged schema regardless of catalog

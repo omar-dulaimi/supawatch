@@ -25,7 +25,7 @@ class CollectSink implements FileSink {
 
 export interface Drift {
   file: string;
-  kind: "missing" | "stale" | "orphaned";
+  kind: "missing" | "stale" | "orphaned" | "format";
 }
 
 export async function check(cfg: SupawatchConfig): Promise<Drift[]> {
@@ -55,7 +55,13 @@ export async function check(cfg: SupawatchConfig): Promise<Drift[]> {
         drift.push({ file, kind: "missing" });
         continue;
       }
-      if (actual !== expected) drift.push({ file, kind: "stale" });
+      if (actual !== expected) {
+        // A lockfile written by an older supawatch differs because the
+        // recorded SHAPE changed, not because the schema did. Saying
+        // "stale" sends a team hunting a schema change that never
+        // happened, so name the real cause.
+        drift.push({ file, kind: lockFormatChanged(actual, expected) ? "format" : "stale" });
+      }
     }
     // Files on disk that regeneration would prune are drift too.
     for (const [dir, prunes] of sink.prunedDirs) {
@@ -76,5 +82,18 @@ export async function check(cfg: SupawatchConfig): Promise<Drift[]> {
     return drift;
   } finally {
     await sql.end();
+  }
+}
+
+// Both sides are the committed and the freshly generated lockfile; a
+// differing `format` means this supawatch records a different shape.
+function lockFormatChanged(actual: string, expected: string): boolean {
+  if (!actual.includes('"format"')) return false;
+  try {
+    const a = JSON.parse(actual) as { format?: unknown };
+    const b = JSON.parse(expected) as { format?: unknown };
+    return a.format !== b.format;
+  } catch {
+    return false;
   }
 }

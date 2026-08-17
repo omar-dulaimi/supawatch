@@ -34,7 +34,11 @@ async function main() {
         return;
       }
       for (const d of drift) {
-        console.log(`[supawatch] drift (${d.kind}): ${d.file}`);
+        console.log(
+          d.kind === "format"
+            ? `[supawatch] ${d.file} was written by a different supawatch version (lockfile format changed, not your schema); run supawatch generate and commit the result`
+            : `[supawatch] drift (${d.kind}): ${d.file}`,
+        );
       }
       process.exitCode = 1;
       return;

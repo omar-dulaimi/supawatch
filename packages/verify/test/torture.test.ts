@@ -625,6 +625,89 @@ describe("torture 4: the runtime environment, not the schema", () => {
   });
 });
 
+describe("torture 5: portability, upgrades and long-lived connections", () => {
+  it("refuses file names that collide on a case insensitive filesystem", async () => {
+    // Postgres holds all three; macOS and Windows would make them one
+    // file and silently destroy two schemas, while Linux CI stays green.
+    const dbc = new PGlite();
+    await dbc.exec(`
+      create table "Users" (id serial primary key, a text);
+      create table users (id serial primary key, b text);
+      create table "USERS" (id serial primary key, c text);
+    `);
+    const dir = await mkdtemp(path.join(tmpdir(), "case-"));
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(dbc),
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        verifyRows: false,
+        log: () => {},
+      });
+      await expect(watcher.runOnce()).rejects.toThrow(/case insensitive filesystem/);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await dbc.close();
+    }
+  });
+
+  it("asks for a reconnect when custom types change, because parsers are fetched once", async () => {
+    // The watcher holds one connection for hours. A type created by a
+    // later migration is unknown to it, so an enum array decodes as the
+    // raw literal "{ok,bad}" forever while the schema demands an array.
+    const dbt = new PGlite();
+    await dbt.exec("create table plain (id serial primary key, v text)");
+    const dir = await mkdtemp(path.join(tmpdir(), "types-"));
+    let refreshed = 0;
+    try {
+      const watcher = new Watcher({
+        query: querierFromPglite(dbt),
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        verifyRows: false,
+        log: () => {},
+        refreshTypes: async () => {
+          refreshed++;
+        },
+      });
+      await watcher.runOnce();
+      expect(refreshed).toBe(0); // baseline connects fresh already
+
+      // a plain column change must not force a reconnect
+      await dbt.exec("alter table plain add column extra text");
+      await watcher.runOnce();
+      expect(refreshed).toBe(0);
+
+      // a new enum type must
+      await dbt.exec("create type mood as enum ('ok', 'bad')");
+      await dbt.exec("create table feelings (id serial primary key, ms mood[])");
+      await watcher.runOnce();
+      expect(refreshed).toBe(1);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await dbt.close();
+    }
+  });
+
+  it("records a lockfile format that changes when the recorded shape does", async () => {
+    const { SchemaLockTarget, FORMAT } = await import("@supawatch/target-schema-lock");
+    const dbl = new PGlite();
+    await dbl.exec("create table t (id serial primary key)");
+    const snap = await introspect(querierFromPglite(dbl));
+    const [file] = new SchemaLockTarget().renderSnapshot(snap, {});
+    const lock = JSON.parse(file.content) as { format: number; tables: unknown[] };
+    // shape facets added since format 1 must be recorded, and the version
+    // must say so, or an upgraded CI reports schema drift that never happened
+    expect(lock.format).toBe(FORMAT);
+    expect(FORMAT).toBeGreaterThanOrEqual(2);
+    expect(lock.tables[0]).toHaveProperty("rlsEnabled");
+    expect(lock.tables[0]).toHaveProperty("kind");
+    await dbl.close();
+  });
+});
+
 describe("multi-schema watcher run stays coherent end to end", () => {
   it("emits prefixed files whose barrel re-exports prefixed names", async () => {
     // inside the repo so the generated module's zod import resolves
