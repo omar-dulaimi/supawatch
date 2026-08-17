@@ -1,5 +1,11 @@
 # @supawatch/target-fast-check
 
+## 0.9.1
+
+### Patch Changes
+
+- @supawatch/core@0.9.1
+
 ## 0.9.0
 
 ### Patch Changes
