@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-json-schema",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "Draft-07 JSON Schemas generated from live Postgres by supawatch, Ajv-verified against real rows.",
   "keywords": [
     "supabase",
