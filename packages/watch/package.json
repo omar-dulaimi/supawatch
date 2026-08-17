@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/watch",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "description": "The supawatch watcher runtime: event-trigger LISTEN, polling, debounced regeneration, row verification.",
   "keywords": [
     "supabase",
