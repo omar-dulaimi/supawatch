@@ -1,6 +1,6 @@
 import postgres from "postgres";
 import { loadConfig } from "./config.js";
-import { readDotEnvDatabaseUrl } from "./run.js";
+import { DRIVER_TRUTH_SETTINGS, readDotEnvDatabaseUrl } from "./run.js";
 import { entryFor, loadTarget } from "./registry.js";
 
 interface CheckResult {
@@ -27,7 +27,11 @@ export async function doctor(cwd: string): Promise<boolean> {
 
   let sql: postgres.Sql | undefined;
   if (url) {
-    sql = postgres(url, { max: 1, connect_timeout: 5 });
+    sql = postgres(url, {
+      max: 1,
+      connect_timeout: 5,
+      connection: { ...DRIVER_TRUTH_SETTINGS },
+    });
     try {
       await sql`select 1`;
       results.push({ name: "connect", ok: true, detail: "select 1 succeeded" });
@@ -42,6 +46,36 @@ export async function doctor(cwd: string): Promise<boolean> {
   }
 
   if (sql) {
+    // supawatch pins these on its own connections, so it always reads
+    // the truth. A consumer's driver does not: with bytea_output=escape
+    // an 8 byte value decodes to 1 wrong byte, and with a non-ISO
+    // DateStyle a date comes back with day and month swapped, both
+    // silently. Report what a plain connection would inherit.
+    const plain = postgres(url!, { max: 1, connect_timeout: 5 });
+    try {
+      const [defaults] = await plain<
+        { datestyle: string; bytea_output: string }[]
+      >`select current_setting('DateStyle') as datestyle,
+               current_setting('bytea_output') as bytea_output`;
+      const problems: string[] = [];
+      if (!defaults.datestyle.startsWith("ISO")) {
+        problems.push(`DateStyle is ${defaults.datestyle} (dates decode wrong; want ISO)`);
+      }
+      if (defaults.bytea_output !== "hex") {
+        problems.push(`bytea_output is ${defaults.bytea_output} (bytea decodes wrong; want hex)`);
+      }
+      results.push({
+        name: "driver settings",
+        ok: problems.length === 0,
+        detail:
+          problems.length === 0
+            ? "DateStyle ISO and bytea_output hex, so driver values are truthful"
+            : `${problems.join("; ")}. supawatch pins these for itself, but your app's own connection will read corrupted values unless it does the same`,
+      });
+    } finally {
+      await plain.end();
+    }
+
     const triggers = await sql`
       select evtname from pg_event_trigger
       where evtname = 'supawatch_schema_watcher'

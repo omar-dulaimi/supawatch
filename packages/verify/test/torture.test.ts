@@ -1,10 +1,10 @@
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { PGlite } from "@electric-sql/pglite";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { exportBaseName, introspect, type Querier, type Snapshot } from "@supawatch/core";
+import { assemble, exportBaseName, introspect, type Querier, type Snapshot } from "@supawatch/core";
 import { SupabaseTypesTarget } from "@supawatch/target-supabase-types";
 import { ZodTarget } from "@supawatch/target-zod";
 import { RestTarget } from "@supawatch/target-rest";
@@ -517,6 +517,111 @@ describe("the ERD parses under real mermaid, hostile names included", () => {
     expect(kept.content).not.toContain("[!NOTE]");
 
     await dbi.close();
+  });
+});
+
+describe("torture 4: the runtime environment, not the schema", () => {
+  it("a table the role cannot read is skipped, not fatal, and the run completes", async () => {
+    const dbp = new PGlite();
+    await dbp.exec(`
+      create table readable (id serial primary key, v text not null);
+      create table forbidden (id serial primary key, secret text not null);
+      insert into readable (v) values ('visible');
+      insert into forbidden (secret) values ('nope');
+    `);
+    // pg_catalog is world readable, so introspection sees a table whose
+    // rows the role cannot select. PGlite has no roles, so the denial is
+    // injected at the querier, which is exactly what the driver surfaces.
+    const base = querierFromPglite(dbp);
+    const denying: typeof base = (async (text: string, params?: unknown[]) => {
+      // only the row read is denied; the catalog stays readable
+      if (text.startsWith('select * from "public"."forbidden"')) {
+        throw new Error("permission denied for table forbidden");
+      }
+      return base(text, params);
+    }) as typeof base;
+
+    const dir = await mkdtemp(path.join(path.dirname(fileURLToPath(import.meta.url)), "priv-"));
+    const logs: string[] = [];
+    try {
+      const watcher = new Watcher({
+        query: denying,
+        schemas: ["public"],
+        targets: [{ target: new ZodTarget(), options: {}, outDir: dir }],
+        source: manualSource(),
+        log: (m: string) => logs.push(m),
+      });
+      const result = await watcher.runOnce();
+      expect(logs.join("\n")).toContain("forbidden: skipped (permission denied for this role)");
+      // the schema is still correct and still written
+      expect(result.files.some((f) => f.includes("forbidden"))).toBe(true);
+      // and the readable table really was verified against its rows
+      const readable = result.verified.find((v) => v.table === "readable");
+      expect(readable).toEqual({ table: "readable", rows: 1, passed: 1, reasons: [] });
+      const denied = result.verified.find((v) => v.table === "forbidden");
+      expect(denied?.rows).toBe(0);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await dbp.close();
+    }
+  });
+
+  it("reports no-evidence tables as unverified instead of 0/0 passed", async () => {
+    const { describeVerified } = await import("@supawatch/watch");
+    const lines = describeVerified([
+      { table: "hidden_by_rls", rows: 0, passed: 0, reasons: [] },
+      { table: "real", rows: 3, passed: 3, reasons: [] },
+      { table: "broken", rows: 2, passed: 1, reasons: ["nope"] },
+    ]);
+    // "0/0 passed" reads like success while proving nothing
+    expect(lines[0]).toBe("ground-truth check, hidden_by_rls: no rows visible, nothing verified");
+    expect(lines[0]).not.toContain("passed");
+    expect(lines[1]).toBe("ground-truth check, real: 3/3 passed");
+    expect(lines[2]).toContain("FAILED");
+  });
+
+  it("arbitraries stay inside what Postgres can actually store", async () => {
+    const dbа = new PGlite();
+    await dbа.exec(`
+      create table wide (
+        id serial primary key,
+        big int8 not null,
+        stamp timestamptz not null
+      );
+    `);
+    const snap = await introspect(querierFromPglite(dbа));
+    const { FastCheckTarget } = await import("@supawatch/target-fast-check");
+    const table = snap.tables[0];
+    const rendered = new FastCheckTarget().renderTable(table, snap, {});
+    const dir = await mkdtemp(path.join(path.dirname(fileURLToPath(import.meta.url)), "arb-"));
+    try {
+      const file = path.join(dir, "wide.mjs");
+      await writeFile(file, assemble(rendered));
+      const mod = await import(`file://${file}`);
+      const fc = (await import("fast-check")).default;
+      const arb = mod[Object.keys(mod).find((k) => k.endsWith("Arb"))!];
+
+      // measured: an unbounded bigInt produced 76 digit values and an
+      // unbounded date reached year 171958; Postgres rejects both
+      for (const sample of fc.sample(arb, { numRuns: 60, seed: 7 })) {
+        const big = BigInt(sample.big);
+        expect(big).toBeLessThanOrEqual(2n ** 63n - 1n);
+        expect(big).toBeGreaterThanOrEqual(-(2n ** 63n));
+        const year = sample.stamp.getUTCFullYear();
+        expect(year).toBeGreaterThan(1800);
+        expect(year).toBeLessThan(2200);
+      }
+      // and they really do insert
+      const q = querierFromPglite(dbа);
+      for (const sample of fc.sample(arb, { numRuns: 10, seed: 7 })) {
+        await q("insert into wide (big, stamp) values ($1, $2)", [sample.big, sample.stamp]);
+      }
+      const [{ n }] = await q<{ n: unknown }>("select count(*)::int as n from wide");
+      expect(Number(n)).toBe(10);
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+      await dbа.close();
+    }
   });
 });
 

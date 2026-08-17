@@ -5,6 +5,7 @@ import {
   listenSource,
   manualSource,
   pollSource,
+  describeVerified,
   querierFrom,
   Watcher,
   type TargetRun,
@@ -27,6 +28,20 @@ export async function buildTargetRuns(cfg: SupawatchConfig): Promise<TargetRun[]
   return runs;
 }
 
+// The driver decodes values by TEXT, so three server settings decide
+// whether what it hands back is the truth. Measured against Postgres 17:
+// with bytea_output=escape an 8 byte value came back as 1 wrong byte,
+// and with DateStyle=German the date 2026-03-04 came back as
+// 2026-04-02, both silently. A database or role can force either for
+// every connection (alter database ... set), so supawatch pins them on
+// its own connections rather than trusting the environment. doctor
+// warns when the environment would corrupt a consumer's connection.
+export const DRIVER_TRUTH_SETTINGS = {
+  DateStyle: "ISO, MDY",
+  bytea_output: "hex",
+  IntervalStyle: "postgres",
+} as const;
+
 export function connect(): postgres.Sql {
   const url = process.env.DATABASE_URL ?? readDotEnvDatabaseUrl();
   if (!url) {
@@ -34,7 +49,7 @@ export function connect(): postgres.Sql {
       "DATABASE_URL is not set; export it or put DATABASE_URL=... in ./.env",
     );
   }
-  return postgres(url, { max: 2 });
+  return postgres(url, { max: 2, connection: { ...DRIVER_TRUTH_SETTINGS } });
 }
 
 // Real projects keep DATABASE_URL in .env; found by dogfooding that
@@ -71,11 +86,11 @@ export async function generateOnce(cfg: SupawatchConfig): Promise<void> {
     console.log(`[supawatch] generated ${result.files.length} files`);
     let failed = 0;
     for (const v of result.verified) {
-      const ok = v.passed === v.rows;
-      if (!ok) failed++;
-      console.log(
-        `[supawatch] ground-truth check, ${v.table}: ${v.passed}/${v.rows} ${ok ? "passed" : `FAILED (${v.reasons[0] ?? ""})`}`,
-      );
+      if (v.passed !== v.rows) failed++;
+    }
+    // one wording, shared with the watcher
+    for (const line of describeVerified(result.verified)) {
+      console.log(`[supawatch] ${line}`);
     }
     if (failed > 0) process.exitCode = 1;
   } finally {
