@@ -1,5 +1,74 @@
 # supawatch
 
+## 0.14.0
+
+### Minor Changes
+
+- e4abf73: Torture round 6 went after determinism and deployment reality, and
+  found three defects including a severe regression from the previous
+  round.
+
+  supawatch could not connect through a connection pooler at all. Pinning
+  driver settings as startup parameters is rejected outright by PgBouncer
+  and Supavisor ("unsupported startup parameter: bytea_output"), which
+  broke Supabase's pooled port, the connection method their serverless
+  guidance recommends. Only pooler-safe parameters are sent now; the
+  settings that cannot be forced are reported as a warning instead, so a
+  corrupting environment is still named rather than silently trusted.
+
+  The watcher looked perfectly healthy while being permanently deaf. A
+  transaction-mode pooler accepts LISTEN and then never delivers, so
+  `supawatch watch` sat there logging "idle, listening" forever and never
+  saw a schema change. It now proves delivery on a separate self-test
+  channel at startup, resolving as soon as the ping lands, and warns with
+  the fix (a direct connection, or `source: { kind: "poll" }`) when
+  nothing arrives.
+
+  Committed files were ordered by locale. `schema.lock.json` and the ER
+  diagram sorted with `localeCompare` and no explicit locale, so ICU
+  decided: measured, `en-US` orders `A_b a-b ab ärger Zeta` while `sv-SE`
+  puts `ärger` last. Both files are committed and byte-compared, so two
+  developers with different `LANG`, or CI with a different ICU build,
+  would see drift on an identical schema. Both now sort by code point.
+
+  Verified clean in the same round: the generated ESM modules import on
+  Node 18, 20, 22 and 24; the `.d.mts` companions give real types under
+  `node10`, `node16`, `nodenext` and `bundler` resolution, each proven with
+  a wrong-shape control; and polling works through a transaction pooler,
+  the documented workaround for the LISTEN limitation.
+
+### Patch Changes
+
+- Updated dependencies [e4abf73]
+  - @supawatch/watch@0.14.0
+  - @supawatch/target-schema-lock@0.14.0
+  - @supawatch/target-erd@0.14.0
+  - @supawatch/core@0.14.0
+  - @supawatch/target-ai-tools@0.14.0
+  - @supawatch/target-arktype@0.14.0
+  - @supawatch/target-dictionary@0.14.0
+  - @supawatch/target-effect@0.14.0
+  - @supawatch/target-factories@0.14.0
+  - @supawatch/target-fast-check@0.14.0
+  - @supawatch/target-forms@0.14.0
+  - @supawatch/target-graphql@0.14.0
+  - @supawatch/target-json-schema@0.14.0
+  - @supawatch/target-mcp@0.14.0
+  - @supawatch/target-orpc@0.14.0
+  - @supawatch/target-pgmq@0.14.0
+  - @supawatch/target-pgtap@0.14.0
+  - @supawatch/target-realtime@0.14.0
+  - @supawatch/target-rest@0.14.0
+  - @supawatch/target-rls@0.14.0
+  - @supawatch/target-schema-card@0.14.0
+  - @supawatch/target-seed@0.14.0
+  - @supawatch/target-service@0.14.0
+  - @supawatch/target-supabase-types@0.14.0
+  - @supawatch/target-trpc@0.14.0
+  - @supawatch/target-typebox@0.14.0
+  - @supawatch/target-valibot@0.14.0
+  - @supawatch/target-zod@0.14.0
+
 ## 0.13.0
 
 ### Minor Changes
