@@ -1,7 +1,17 @@
-# supawatch
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/banner-dark.svg">
+    <img src="assets/banner-light.svg" width="880"
+         alt="supawatch: your Postgres schema, compiled to everything">
+  </picture>
+</p>
 
-[![npm](https://img.shields.io/npm/v/supawatch)](https://www.npmjs.com/package/supawatch)
-[![ci](https://github.com/omar-dulaimi/supawatch/actions/workflows/ci.yml/badge.svg)](https://github.com/omar-dulaimi/supawatch/actions/workflows/ci.yml)
+<p align="center">
+  <a href="https://www.npmjs.com/package/supawatch"><img
+     src="https://img.shields.io/npm/v/supawatch" alt="npm"></a>
+  <a href="https://github.com/omar-dulaimi/supawatch/actions/workflows/ci.yml"><img
+     src="https://github.com/omar-dulaimi/supawatch/actions/workflows/ci.yml/badge.svg" alt="ci"></a>
+</p>
 
 Your Postgres schema, compiled to everything. A DDL event trigger rings
 `pg_notify` on any schema change, a watcher re-runs every generation
