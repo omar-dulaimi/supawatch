@@ -6,3 +6,7 @@ e2e/tars/
 
 # local torture staging dirs, never committed
 .torture*-local/
+
+# brand asset generator font cache, fetched on demand
+scripts/brand/.fonts/
+scripts/brand/__pycache__/
