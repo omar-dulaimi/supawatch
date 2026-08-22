@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-dictionary",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "A markdown data dictionary generated from live Postgres by supawatch, comments sourced from the database itself.",
   "keywords": [
     "supabase",

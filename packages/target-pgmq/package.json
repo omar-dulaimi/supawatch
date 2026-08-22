@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-pgmq",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Typed pgmq queue clients generated from live Postgres by supawatch, one per detected queue.",
   "keywords": [
     "supabase",

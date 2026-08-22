@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-effect",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Effect Schema structs generated from live Postgres by supawatch, mapped to what the driver actually returns.",
   "keywords": [
     "supabase",

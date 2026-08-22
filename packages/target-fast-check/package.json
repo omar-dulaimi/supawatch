@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-fast-check",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "fast-check arbitraries generated from live Postgres by supawatch, producing rows shaped like real driver output.",
   "keywords": [
     "supabase",

@@ -1,5 +1,42 @@
 # supawatch
 
+## 0.14.2
+
+### Patch Changes
+
+- 313933a: Update the package description on npm. It still read "Validator schemas and
+  types generated from your live Postgres", written when those were the only
+  two things supawatch emitted. It now generates twenty-six targets, so the
+  npmjs.com listing was describing an older tool than the one being installed.
+  - @supawatch/core@0.14.2
+  - @supawatch/target-ai-tools@0.14.2
+  - @supawatch/target-arktype@0.14.2
+  - @supawatch/target-dictionary@0.14.2
+  - @supawatch/target-effect@0.14.2
+  - @supawatch/target-erd@0.14.2
+  - @supawatch/target-factories@0.14.2
+  - @supawatch/target-fast-check@0.14.2
+  - @supawatch/target-forms@0.14.2
+  - @supawatch/target-graphql@0.14.2
+  - @supawatch/target-json-schema@0.14.2
+  - @supawatch/target-mcp@0.14.2
+  - @supawatch/target-orpc@0.14.2
+  - @supawatch/target-pgmq@0.14.2
+  - @supawatch/target-pgtap@0.14.2
+  - @supawatch/target-realtime@0.14.2
+  - @supawatch/target-rest@0.14.2
+  - @supawatch/target-rls@0.14.2
+  - @supawatch/target-schema-card@0.14.2
+  - @supawatch/target-schema-lock@0.14.2
+  - @supawatch/target-seed@0.14.2
+  - @supawatch/target-service@0.14.2
+  - @supawatch/target-supabase-types@0.14.2
+  - @supawatch/target-trpc@0.14.2
+  - @supawatch/target-typebox@0.14.2
+  - @supawatch/target-valibot@0.14.2
+  - @supawatch/target-zod@0.14.2
+  - @supawatch/watch@0.14.2
+
 ## 0.14.1
 
 ### Patch Changes
