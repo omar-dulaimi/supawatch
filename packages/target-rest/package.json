@@ -1,6 +1,6 @@
 {
   "name": "@supawatch/target-rest",
-  "version": "0.14.1",
+  "version": "0.14.2",
   "description": "Hono route modules generated from live Postgres by supawatch, input-validated by the generated Zod schemas.",
   "keywords": [
     "supabase",

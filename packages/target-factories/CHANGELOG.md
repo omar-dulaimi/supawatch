@@ -1,5 +1,11 @@
 # @supawatch/target-factories
 
+## 0.14.2
+
+### Patch Changes
+
+- @supawatch/core@0.14.2
+
 ## 0.14.1
 
 ### Patch Changes
